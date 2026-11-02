@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useParams } from 'next/navigation'
 import { getSession, signIn } from 'next-auth/react'
 import { Form } from '@/components/ui/form'
+import { SellixLogo } from '@/components/brand/sellix-logo'
 import { Button } from '@/components/ui/button'
 import InputsTemplate from '@/components/templates/inputs'
 import { logoutReasonFromSearch } from '@/lib/force-logout'
@@ -66,7 +67,9 @@ export default function StaffSignInForm() {
     <div className="w-full px-12 flex justify-center">
       <div className="flex flex-col justify-center items-center h-svh py-10 w-full">
         <div className="flex justify-center w-full">
-          <h1 className="bytewave-heading">Bytewave POS</h1>
+          <h1>
+            <SellixLogo size={48} tagline="Staff" />
+          </h1>
         </div>
         <div className="w-full flex justify-center">
           <div className="grid items-center gap-1.5 mt-40 ml-6 w-[500px]">
