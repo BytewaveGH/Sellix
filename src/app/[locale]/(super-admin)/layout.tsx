@@ -1,5 +1,6 @@
 'use client'
 
+import { SellixLogo } from '@/components/brand/sellix-logo'
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -17,17 +18,7 @@ import { CommandPalette, openCommandPalette } from './super-admin/_components/co
 import { RegisterAppWizard } from './super-admin/_components/app-forms'
 import { ConsoleContext } from './super-admin/_components/console-context'
 
-const BrandMark = () => (
-  <div className="flex items-center gap-2.5">
-    <span className="h-9 w-9 rounded-xl bg-gradient-to-br from-endeavour to-veniceBlue text-white font-extrabold text-lg flex items-center justify-center shadow-sm shadow-endeavour/30">
-      B
-    </span>
-    <span className="leading-tight">
-      <span className="block text-[15px] font-extrabold tracking-tight text-stone-900">Bytewave</span>
-      <span className="block text-[11px] font-semibold text-stone-400">Platform console</span>
-    </span>
-  </div>
-)
+const BrandMark = () => <SellixLogo size={36} tagline="Platform console" />
 
 const Sidebar = ({ base, onNavigate, onRegister }: { base: string; onNavigate?: () => void; onRegister: () => void }) => {
   const pathname = usePathname()
@@ -80,7 +71,10 @@ const Sidebar = ({ base, onNavigate, onRegister }: { base: string; onNavigate?: 
             <span className="flex-1">{item.label}</span>
             {!!item.alert && (
               <span
-                className={cn('text-[11px] font-bold tabular-nums rounded-md px-1.5', item.active ? 'bg-white/20' : 'bg-amber-100 text-amber-800')}
+                className={cn(
+                  'text-[11px] font-bold tabular-nums rounded-md px-1.5',
+                  item.active ? 'bg-white/20' : 'bg-amber-100 text-amber-800'
+                )}
                 aria-label={`${item.alert} need attention`}
               >
                 {item.alert}

@@ -1,12 +1,12 @@
 'use client'
 
+import { SellixLogo } from '@/components/brand/sellix-logo'
 import * as z from 'zod'
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
 
 import { Form } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,6 @@ const formSchema = z.object({
 type FormType = z.infer<typeof formSchema>
 
 export default function SelectApp() {
-  const signInText = useTranslations('Authentication')
   const params = useParams()
   const locale = (params?.locale as string) || 'en'
 
@@ -65,7 +64,9 @@ export default function SelectApp() {
 
       <div className="flex flex-col justify-center items-center h-svh py-10 w-full">
         <div className="flex justify-center w-full">
-          <h1 className="bytewave-heading">{signInText('byteWave')}</h1>
+          <h1>
+            <SellixLogo size={48} />
+          </h1>
         </div>
         <div className="w-full flex justify-center">
           <div className="grid items-center gap-1.5 mt-40 ml-6 w-[500px]">

@@ -13,8 +13,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { Fragment } from 'react'
-import Image from 'next/image'
-import byteLogo from '@/assets/images/byte.png'
+import { SellixLogo } from '@/components/brand/sellix-logo'
 
 interface SidebarProps {
   isGrouped?: boolean
@@ -55,7 +54,9 @@ export function AppSidebar({ isGrouped, groupedItems = [], loading }: SidebarPro
   return (
     <Sidebar>
       <SidebarContent>
-        <Image src={byteLogo} alt="" width={300} height={50} />
+        <div className="px-3 pt-4 pb-1">
+          <SellixLogo size={36} tagline="Business suite" />
+        </div>
         <SidebarGroup>
           {loading ? (
             <div className="flex flex-col gap-5 px-2 pt-2" aria-busy="true" aria-label="Loading menu" data-testid="sidebar-loading">
@@ -73,30 +74,30 @@ export function AppSidebar({ isGrouped, groupedItems = [], loading }: SidebarPro
             </div>
           ) : isGrouped ? (
             <>
-              {groupedItems.map((group: { title: string; items: { label: string; href: string; icon: React.ReactNode | any; locked?: boolean }[] }) => {
-                return (
-                  <>
-                    <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {group.items.map((item) => (
-                          <SidebarMenuItem key={item.label}>
-                            <SidebarMenuButton asChild>
-                              <a href={item.href}>
-                                <item.icon />
-                                <span>{item.label}</span>
-                                {item.locked && (
-                                  <Lock className="ml-auto !h-3.5 !w-3.5 text-stone-400" aria-label="Not on your plan" />
-                                )}
-                              </a>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        ))}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </>
-                )
-              })}
+              {groupedItems.map(
+                (group: { title: string; items: { label: string; href: string; icon: React.ReactNode | any; locked?: boolean }[] }) => {
+                  return (
+                    <>
+                      <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
+                      <SidebarGroupContent>
+                        <SidebarMenu>
+                          {group.items.map((item) => (
+                            <SidebarMenuItem key={item.label}>
+                              <SidebarMenuButton asChild>
+                                <a href={item.href}>
+                                  <item.icon />
+                                  <span>{item.label}</span>
+                                  {item.locked && <Lock className="ml-auto !h-3.5 !w-3.5 text-stone-400" aria-label="Not on your plan" />}
+                                </a>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          ))}
+                        </SidebarMenu>
+                      </SidebarGroupContent>
+                    </>
+                  )
+                }
+              )}
             </>
           ) : (
             <Fragment key={'no-group'}>

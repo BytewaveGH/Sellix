@@ -1,5 +1,6 @@
 'use client'
 
+import { SellixLogo } from '@/components/brand/sellix-logo'
 import * as z from 'zod'
 import React, { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -67,12 +68,11 @@ export default function SuperAdminSignInForm() {
           <rect width="100%" height="100%" fill="url(#sa-grid)" />
         </svg>
         <div className="relative flex items-center gap-3">
-          <span className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur font-extrabold text-lg flex items-center justify-center">B</span>
-          <span className="text-lg font-extrabold tracking-tight">Bytewave</span>
+          <SellixLogo size={40} tone="white" />
         </div>
         <div className="relative max-w-md">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/60">Platform console</p>
-          <h1 className="mt-3 text-4xl font-extrabold leading-tight tracking-tight">Every business on Bytewave, in one place.</h1>
+          <h1 className="mt-3 text-4xl font-extrabold leading-tight tracking-tight">Every business on Sellix, in one place.</h1>
           <p className="mt-4 text-white/75 leading-relaxed">
             Register apps, manage owners and staff access, and keep an eye on how each business is doing.
           </p>
@@ -84,10 +84,7 @@ export default function SuperAdminSignInForm() {
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2.5 mb-10">
-            <span className="h-9 w-9 rounded-xl bg-gradient-to-br from-endeavour to-veniceBlue text-white font-extrabold flex items-center justify-center">
-              B
-            </span>
-            <span className="text-base font-extrabold tracking-tight text-stone-900">Bytewave</span>
+            <SellixLogo size={36} />
           </div>
           <h2 className="text-2xl font-extrabold tracking-tight text-stone-900">Super admin sign in</h2>
           <p className="text-sm text-stone-500 mt-1.5">Manage the businesses running on the platform.</p>

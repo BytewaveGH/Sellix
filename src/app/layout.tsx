@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: slug ?? 'sellix',
     description:
-      'Bytewave POS — multi-tenant point-of-sale and business management platform, powering retail, eatery, and amusement park operations from one dashboard.',
+      'Sellix — multi-tenant point-of-sale and business management platform, powering retail, eatery, and amusement park operations from one dashboard.',
   }
 }
 
