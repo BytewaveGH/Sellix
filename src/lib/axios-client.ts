@@ -42,9 +42,10 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new Event(BILLING_CHANGED_EVENT))
     }
 
-    // Only a 401 refreshes — never a 403 — and only once per request.
-    const original = error.config as AxiosRequestConfig & { _retry?: boolean }
-    if (error.response?.status !== 401 || !original) {
+    // Only a 401 refreshes — never a 403 — and only once per request. A request
+    // marked `skipAuthRefresh` (e.g. checking a typed-in password) gets its 401 as is.
+    const original = error.config as AxiosRequestConfig & { _retry?: boolean; skipAuthRefresh?: boolean }
+    if (error.response?.status !== 401 || !original || original.skipAuthRefresh) {
       return Promise.reject(error)
     }
     if (original._retry) {

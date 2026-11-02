@@ -657,6 +657,127 @@ This applies to every `granularity` (`hour`, `day`, `week`, `month`) and is addi
 
 Menu items can now be priced at 0, with each pick-one choice holding its full price in `priceDelta` (e.g. ice cream flavours ₵15/₵22). `app/application/eatery` already accepts `price` 0 and adds `priceDelta`s in `storefront.go` order pricing, so nothing is needed. Please don't add a "price must be > 0" rule for items.
 
+## 10. Accounts and team: passwords, suspend, forgot password (changes to existing services)
+
+The dashboard now has the same account pages in every module (retail, eatery, real estate, amusement):
+
+- **My account** (`/account`): everyone. Shows your details and what you can do, and lets you change your password.
+- **Team** (`/team`): owner and staff with `canManageEmployees`. Add, edit, reset password, suspend or reactivate, and remove staff. It replaces `/stores/users`, which now redirects there.
+- **Forgot password** (`/forgot-password`): owners. Staff ask the owner or a manager, who resets the password from Team. That already works through `PUT /employees/:id { password }`.
+
+These pages call the endpoints below. Until each one ships, the page shows a plain message, such as "isn't switched on yet — contact Bytewave support", instead of failing silently.
+
+**Important for every password endpoint:** answer a wrong current password with **400** `{ "error": "invalid_current_password" }`, never 401. A 401 means "session expired" to the dashboard. The change-password calls opt out of the token refresh, but other clients may not.
+
+### 10.1 Staff change their own password (`sellix.apis`, new)
+
+`PUT /employees/me/password`. Any signed-in, active employee (`AnyStaff`), acting on the employee in the token.
+
+```json
+{ "currentPassword": "old-pass1", "newPassword": "new-pass22" }
+```
+
+- 200 `{ "message": "password updated" }`.
+- 400 `invalid_current_password` when the current password doesn't match.
+- 422 / 400 `weak_password` when `newPassword` has fewer than 8 characters, or no letter, or no digit. The dashboard checks this too.
+- Only for employee tokens. An owner token gets 403 (owners use §10.3).
+
+Today staff without `canManageEmployees` can't change their own password at all.
+
+### 10.2 Staff status, email clashes and self-protection (`sellix.apis`, `PUT/POST/DELETE /employees`)
+
+The `employee` table already has `status` (`active` | `suspended`). Login and every request already refuse a suspended employee. `PUT /employees/:id` can't change it, though, because `UpdateEmployeeRequest` has no `status`.
+
+1. Accept `"status": "active" | "suspended"` in `PUT /employees/:id`, and return the saved employee as today. The dashboard checks the returned `status`. If it doesn't match, it tells the owner the action isn't switched on yet, which is what happens today.
+2. An employee can't suspend or delete **themselves**: 400 `cannot_change_own_account`. The dashboard already hides those buttons on your own card.
+3. Duplicate email on create or update: return **409** `{ "error": "email_taken" }` instead of the raw unique-constraint 500.
+4. Passwords on create and update: same rule as §10.1 (8+ characters, a letter and a digit). The dashboard enforces it already.
+5. The dashboard no longer sends `username`; staff sign in by email, and the API never stored it.
+
+### 10.3 Owner passwords (`sellix.account`)
+
+The routes exist, but `UpdatePassword`, `SendPasswordResetCode`, `VerifyOTP`, `ResetPassword` and `ResetUserPassword` in `app/application/auth/service.go` are all `panic("unimplemented")`. Every call ends in a 500.
+
+**Change password** (signed in): `PUT /auth/update-password`
+
+```json
+{ "currentPassword": "old-pass1", "newPassword": "new-pass22", "confirmNewPassword": "new-pass22" }
+```
+
+- 200 on success.
+- 400 `invalid_current_password` on a wrong current password.
+- 400 `weak_password` on a weak new one (8+ characters, letter and digit).
+- If the owner has the same email on several businesses (the 409 business picker at login), change the password for **this** account only, the one in the token.
+
+**Forgot password** (signed out). Header `X-Tenant-Domain: admin`.
+
+1. `POST /auth/send-otp` `{ "email": "owner@shop.com" }`
+   - Always 200 `{ "message": "OTP sent" }`, whether or not the email exists, so the endpoint can't be used to check which emails have accounts.
+   - Email a 6-digit code that expires in **15 minutes**. A new request replaces the old code.
+   - Rate-limit to 5 requests per email per hour, returning 429.
+2. `PUT /auth/reset-password` `{ "email": "...", "otp": "123456", "newPassword": "...", "confirmNewPassword": "..." }`
+   - 200 on success.
+   - 400 `invalid_code` when the code is wrong or expired. After 5 wrong tries the code is burned.
+   - 400 `weak_password` on a weak password.
+   - Resets **every** owner account with that email, because the owner proved they own the inbox. Refresh tokens issued before the reset stop working.
+   - `ResetPasswordRequest` changes from `{ username, … }` to `{ email, otp, … }`. The separate `POST /auth/verify-otp` step isn't used by the dashboard.
+
+**Remove or lock down `PUT /auth/reset-password/:id`** in both `sellix.account` and `sellix.apis`. It sits **outside** the authentication middleware. Once it's implemented, anyone could set any account's password. Either delete it, or put it behind the platform key (`X-Platform-Key`) for the super-admin console.
+
+## 11. Store (retail) module: orders, customers, settings (additions to `sellix.apis`)
+
+Every page in the store menu now exists:
+
+- **Sales:** All orders, Pending, Completed, Customers.
+- **Products:** All products, Inventory, Warehouses.
+- **Settings:** Store settings, Payment.
+
+Orders merge counter sales (`GET /sales`) and invoices (`GET /invoices`). "Pending" means unpaid invoices. Customers are grouped from invoices by phone number. Everything works today with the endpoints that exist. The items below make it exact and fast as the data grows.
+
+### 11.1 Store settings (new) — most important
+
+Store settings (business details printed on receipts, the receipt footer, the POS's default warehouse and prices) and Payment settings (accepted methods, MoMo network, number, account name and merchant ID) are kept **in each browser** today. Every till has to be set up separately, and a new device starts blank.
+
+`GET /store/settings` and `PUT /store/settings`, one document per business. Reading needs any signed-in staff, because the POS reads it. Writing needs `canManageOperations`.
+
+```json
+{
+  "business": { "name": "Adom Mini Mart", "phone": "0241234567", "email": "", "address": "Shop 12, Kaneshie Market", "taxId": "" },
+  "receipt": { "footer": "Thank you!", "showCashier": true, "autoPrint": false },
+  "pos": { "defaultWarehouseId": 3, "defaultCustomerType": "retail" },
+  "payments": { "cash": true, "momo": true, "momoNetwork": "mtn", "momoNumber": "0241234567", "momoName": "Adom Enterprise", "momoMerchantId": "" }
+}
+```
+
+- Store it as JSON, as with the eatery theme.
+- Validate: at least one of `cash`/`momo` is true; `momoNetwork` is one of `mtn | telecel | airteltigo`; `momoNumber` is empty or 10 digits starting with 0; `defaultWarehouseId` is null or a warehouse of this business.
+- Missing fields fall back to defaults (`withDefaults` in `src/lib/store/settings.ts`).
+- Also enforce `payments`: `POST /sales` with a turned-off `paymentType` returns 422.
+
+### 11.2 Filters on the order lists
+
+The Orders pages load the latest 300 sales and 500 invoices, then filter in the browser. Please add:
+
+- **`GET /sales`**:
+  - `from`, `to`: RFC 3339, the same as `/stats` (§9.6).
+  - `paymentType`: `cash` | `momo`.
+  - `q`: matches the sale id or a product name.
+  - `employeeId`.
+- **`GET /invoices`**:
+  - `status`: `pending` | `paid`. The dashboard already calls it as `FetchByStatus`.
+  - `from`, `to`: on the invoice `date`.
+  - `q`: matches the customer name, phone, invoice id or a product name.
+- Keep `{ data, count }` so the pages can show "x of y" and page through.
+
+### 11.3 Customers (optional, later)
+
+Customers exist only as `customerName`/`customerPhone` on invoices, so one person typed two ways appears twice when one invoice has no phone. A `customer` table would fix that, with the invoice linking to it. So would a `GET /customers` that groups invoices by normalised phone (`0XXXXXXXXX`, with `+233` folded in) and returns name, phone, total paid, total owed and last invoice date. The frontend does the same grouping today (`customersFrom` in `src/lib/store/orders.ts`), so either can replace it later.
+
+### 11.4 Small fixes found on the way
+
+- The dashboard calls `PATCH /invoices/:id/unpay` (Inventory › Invoices, "mark as pending"). That route doesn't exist and returns 404. Either add it (set `payment_status` back to `pending` and clear `paid_at`), or tell us and we'll remove the button.
+- Paid invoices count in the stats on `CreateTime` but chart on `PaidAt`. See §9.5.
+
 ## Priority
 
 1. Tenant CRUD + owner-account creation (§1) — unblocks the whole "register a new business" flow for real, replaces the local JSON-file placeholder entirely.
@@ -666,7 +787,9 @@ Menu items can now be priced at 0, with each pick-one choice holding its full pr
 5. Eatery platform (§7) — owner dashboard and public storefronts are live on browser-only storage; customers' orders only reach the owner once these exist.
 6. Subscriptions and billing (§8) — plans, payments and gating work today on a server-side JSON file. These endpoints make billing durable, and §8.4 makes access limits enforceable instead of only shown in the UI.
 7. Store stats fixes (§9) — §9.1 (cost of goods per unit) first: until then any piece or pack sold under the flat/wholesale rule is costed as a whole box, so those products show a loss. §9.4–9.5 make daily cash/MoMo reconciliation exact.
-8. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
-9. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
+8. Accounts and team (§10) — §10.3's `PUT /auth/reset-password/:id` lockdown first (security). Then owner change/forgot password (§10.3), staff change password (§10.1) and suspend (§10.2).
+9. Store module (§11) — §11.1 store settings first, so every till shares the receipt and payment setup. Then the list filters (§11.2).
+10. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
+11. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
 
 Happy to hop on a call to go through response shapes/edge cases once you've had a look.

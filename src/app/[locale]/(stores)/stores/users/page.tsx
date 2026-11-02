@@ -1,7 +1,6 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import Main from './_widgets/main'
-
-export default function EmployeesPage() {
-  return <Main />
+// Staff management moved to /team, shared by every module.
+export default function EmployeesPage({ params }: { params: { locale: string } }) {
+  redirect(`/${params.locale}/team`)
 }

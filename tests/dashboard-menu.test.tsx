@@ -36,14 +36,16 @@ describe('which module a page belongs to', () => {
     expect(appTypeFromPath('/en/eatery/pos')).toBe('eatery')
     expect(appTypeFromPath('/fr/real-estate')).toBe('real-estate')
     expect(appTypeFromPath('/en/amusement/tickets')).toBe('amusement')
-    // Shared pages (Employees lives under /stores for every vertical) don't say.
-    expect(appTypeFromPath('/en/stores/users')).toBeNull()
+    expect(appTypeFromPath('/en/stores/orders')).toBe('retail')
+    // Pages every module shares don't say.
+    expect(appTypeFromPath('/en/team')).toBeNull()
+    expect(appTypeFromPath('/en/account')).toBeNull()
     expect(appTypeFromPath('/en')).toBeNull()
   })
 
   it('never falls back to retail while the session is loading', () => {
-    expect(dashboardAppType('/en/stores/users', undefined, true)).toBeNull()
-    expect(dashboardAppType('/en/stores/users', 'eatery', false)).toBe('eatery')
+    expect(dashboardAppType('/en/team', undefined, true)).toBeNull()
+    expect(dashboardAppType('/en/team', 'eatery', false)).toBe('eatery')
     expect(dashboardAppType('/en/eatery', 'retail', false)).toBe('eatery')
     expect(dashboardAppType('/en/stores/pos', undefined, false)).toBe('retail')
   })
@@ -58,7 +60,7 @@ describe('dashboard menu on a slow network', () => {
     render(<ILayout>page</ILayout>)
     expect(screen.getByTestId('sidebar-loading')).toBeTruthy()
     expect(screen.queryByText('POS')).toBeNull()
-    expect(screen.queryByText('All Products')).toBeNull()
+    expect(screen.queryByText('All products')).toBeNull()
     expect(screen.queryByText('Access POS')).toBeNull()
   })
 
@@ -69,16 +71,16 @@ describe('dashboard menu on a slow network', () => {
     expect(screen.queryByTestId('sidebar-loading')).toBeNull()
     expect(screen.getByText('Counter (POS)')).toBeTruthy()
     expect(screen.getByText('Ingredients & costs')).toBeTruthy()
-    expect(screen.queryByText('All Products')).toBeNull()
+    expect(screen.queryByText('All products')).toBeNull()
     expect(screen.queryByText('Access POS')).toBeNull()
   })
 
-  it('keeps the eatery menu on shared pages like Employees', () => {
+  it('keeps the eatery menu on shared pages like Team', () => {
     auth.session = owner
-    nav.pathname = '/en/stores/users'
+    nav.pathname = '/en/team'
     render(<ILayout>page</ILayout>)
     expect(screen.getByText('Live orders')).toBeTruthy()
-    expect(screen.queryByText('All Products')).toBeNull()
+    expect(screen.queryByText('All products')).toBeNull()
   })
 
   it('retail still gets its POS menu and button', () => {
@@ -88,7 +90,7 @@ describe('dashboard menu on a slow network', () => {
     }
     nav.pathname = '/en/stores/overview'
     render(<ILayout>page</ILayout>)
-    expect(screen.getByText('All Products')).toBeTruthy()
+    expect(screen.getByText('All products')).toBeTruthy()
     expect(screen.getByText('Access POS')).toBeTruthy()
   })
 })

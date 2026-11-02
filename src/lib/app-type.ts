@@ -29,10 +29,10 @@ export const lookupTenantAppType = async (slug: string, fetchImpl: typeof fetch 
   }
 }
 
-// The module a dashboard URL belongs to: /en/eatery/… → eatery. Shared pages
-// under /stores (e.g. Employees, used by every vertical) are ambiguous → null,
-// so the session's appType decides there.
-const PATH_MODULES: Record<string, AppType> = { eatery: 'eatery', 'real-estate': 'real-estate', amusement: 'amusement' }
+// The module a dashboard URL belongs to: /en/eatery/… → eatery, /en/stores/… →
+// retail. Pages every module shares (/team, /account, /billing) are ambiguous
+// → null, so the session's appType decides there.
+const PATH_MODULES: Record<string, AppType> = { stores: 'retail', eatery: 'eatery', 'real-estate': 'real-estate', amusement: 'amusement' }
 export const appTypeFromPath = (pathname: string | null | undefined): AppType | null => {
   const seg = (pathname ?? '').replace(/^\/(en|fr)(?=\/|$)/, '').split('/')[1] ?? ''
   return PATH_MODULES[seg] ?? null
