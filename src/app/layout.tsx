@@ -36,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang={locale}>
-      {/* Icons come from src/app: favicon.ico, icon.svg (the Sellix mark) and apple-icon.png.
+      {/* Icons come from src/app: favicon.ico, icon.png (the Sellix logo) and apple-icon.png.
           Public eatery storefronts swap in the restaurant's own logo (use-brand-favicon.ts). */}
       <body className={`${mulish.variable} font-mulish`}>
         <Providers>{children}</Providers>

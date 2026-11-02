@@ -2,7 +2,7 @@
 
 // The browser-tab icon on a restaurant's public pages: their logo, or their
 // initials in their brand colours (like BrandMark) when no logo is uploaded.
-// The platform's own icons (src/app/icon.svg…) come back when the customer
+// The platform's own icons (src/app/icon.png…) come back when the customer
 // leaves the storefront.
 
 import { useEffect, useState } from 'react'

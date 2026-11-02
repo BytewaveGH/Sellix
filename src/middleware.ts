@@ -28,6 +28,8 @@ const EMPLOYEE_ROUTE_PRIORITY = [
   { path: '/stores/products', perm: 'canManageProducts' },
   { path: '/stores/customers', perm: 'canManageSales' },
   { path: '/stores/users', perm: 'canManageEmployees' },
+  // Shared by every module (src/app/[locale]/(account)). /account is open to all staff.
+  { path: '/team', perm: 'canManageEmployees' },
   { path: '/stores/settings', perm: 'canManageOperations' },
   { path: '/stores/payment-settings', perm: 'canManageOperations' },
   // Real estate — same permission keys as its sidebar (src/components/generals/layouts/logics/data.tsx).
@@ -102,6 +104,7 @@ export default auth((req: NextAuthRequest) => {
   const isAuthPage =
     /^\/(en|fr)\/?$/.test(pathname) ||
     /^\/(en|fr)\/staff\/?$/.test(pathname) ||
+    /^\/(en|fr)\/forgot-password\/?$/.test(pathname) ||
     SUPER_ADMIN_LOGIN_RE.test(pathname) ||
     AMUSEMENT_BOARD_RE.test(pathname) ||
     EAT_RE.test(pathname) ||

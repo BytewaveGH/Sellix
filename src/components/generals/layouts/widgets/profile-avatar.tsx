@@ -2,7 +2,7 @@
 
 import { signOut, useSession } from 'next-auth/react'
 import React from 'react'
-import { LogOut } from 'lucide-react'
+import { CircleUser, LogOut } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import AvatarTemplate from '@/components/templates/avatar'
 import Link from 'next/link'
@@ -36,9 +36,9 @@ const ProfileAvatar = ({ image }: ProfileAvatarProps) => {
           </div>
         </div>,
 
-        <Link key={'link'} className="p-2  hover:bg-gray-100  flex items-center rounded cursor-pointer" href="/en/launch/profile">
-          {/* <SeedstarUserVerify fill={'#0865AC'} width={18} height={18} /> */}
-          <p className="seedstars-paragraph p-1 text-stone-500 ">Profile</p>
+        <Link key={'link'} className="p-2  hover:bg-gray-100  flex items-center rounded cursor-pointer" href={`/${locale}/account`}>
+          <CircleUser size={16} className="text-endeavour" />
+          <span className="inline-block ml-2 seedstars-paragraph text-stone-500">My account</span>
         </Link>,
 
         // <Separator className="bg-gray-200" />,
@@ -46,8 +46,10 @@ const ProfileAvatar = ({ image }: ProfileAvatarProps) => {
           key={'logout'}
           className="p-2 hover:bg-gray-100 rounded cursor-pointer flex items-center"
           onClick={async () => {
-            await signOut({ callbackUrl: `/${locale}`, redirect: false })
-            router.push(`/${locale}`)
+            // Staff go back to the staff sign-in, owners to theirs.
+            const back = session?.user?.accountType === 'employee' ? `/${locale}/staff` : `/${locale}`
+            await signOut({ callbackUrl: back, redirect: false })
+            router.push(back)
           }}
         >
           <LogOut size={16} className="text-endeavour" />{' '}

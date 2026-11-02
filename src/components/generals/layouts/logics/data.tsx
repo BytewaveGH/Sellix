@@ -27,6 +27,7 @@ import {
   Palette,
   Receipt,
   Gem,
+  CircleUser,
 } from 'lucide-react'
 import { ITopNavItems } from './interface'
 
@@ -45,32 +46,26 @@ const retailSidebarItems = [
     ],
   },
   {
+    title: 'Sales',
+    items: [
+      { label: 'All orders', href: '/en/stores/orders', icon: ShoppingCart, requiredPermission: 'canManageSales' },
+      { label: 'Pending', href: '/en/stores/orders/pending', icon: Hourglass, requiredPermission: 'canManageSales' },
+      { label: 'Completed', href: '/en/stores/orders/completed', icon: CheckCircle, requiredPermission: 'canManageSales' },
+      { label: 'Customers', href: '/en/stores/customers', icon: Users, requiredPermission: 'canManageSales' },
+    ],
+  },
+  {
     title: 'Products',
     items: [
-      { label: 'All Products', href: '/en/stores/products', icon: Package, requiredPermission: 'canManageProducts' },
-      { label: 'Warehouse', href: '/en/stores/products/categories', icon: Building2, requiredPermission: 'canManageWarehouses' },
+      { label: 'All products', href: '/en/stores/products', icon: Package, requiredPermission: 'canManageProducts' },
       { label: 'Inventory', href: '/en/stores/products/inventory', icon: Warehouse, requiredPermission: 'canManageStock' },
-    ],
-  },
-  {
-    title: 'Orders',
-    items: [
-      { label: 'All Orders', href: '/en/stores/orders', icon: ShoppingCart, requiredPermission: 'canManageSales' },
-      { label: 'Pending Orders', href: '/en/stores/orders/pending', icon: Hourglass, requiredPermission: 'canManageSales' },
-      { label: 'Completed Orders', href: '/en/stores/orders/completed', icon: CheckCircle, requiredPermission: 'canManageSales' },
-    ],
-  },
-  {
-    title: 'Users',
-    items: [
-      { label: 'Customers', href: '/en/stores/customers', icon: Users, requiredPermission: 'canManageSales' },
-      { label: 'Employees', href: '/en/stores/users', icon: UserCog, requiredPermission: 'canManageEmployees' },
+      { label: 'Warehouses', href: '/en/stores/products/categories', icon: Building2, requiredPermission: 'canManageWarehouses' },
     ],
   },
   {
     title: 'Settings',
     items: [
-      { label: 'Store Settings', href: '/en/stores/settings', icon: Settings, requiredPermission: 'canManageOperations' },
+      { label: 'Store settings', href: '/en/stores/settings', icon: Settings, requiredPermission: 'canManageOperations' },
       { label: 'Payment', href: '/en/stores/payment-settings', icon: CreditCard, requiredPermission: 'canManageOperations' },
     ],
   },
@@ -96,10 +91,6 @@ const amusementSidebarItems = [
   {
     title: 'Leaderboard',
     items: [{ label: 'Leaderboard', href: '/en/amusement/leaderboard', icon: Trophy, requiredPermission: 'canManageSales' }],
-  },
-  {
-    title: 'Users',
-    items: [{ label: 'Employees', href: '/en/stores/users', icon: UserCog, requiredPermission: 'canManageEmployees' }],
   },
 ]
 
@@ -140,10 +131,6 @@ const realEstateSidebarItems = [
       },
     ],
   },
-  {
-    title: 'Users',
-    items: [{ label: 'Employees', href: '/en/stores/users', icon: UserCog, requiredPermission: 'canManageEmployees' }],
-  },
 ]
 
 // Eatery has no dedicated modules built yet (see the amusement park build for the
@@ -168,10 +155,6 @@ const eaterySidebarItems = [
       { label: 'Settings', href: '/en/eatery/settings', icon: Settings, requiredPermission: 'canManageOperations' },
     ],
   },
-  {
-    title: 'Users',
-    items: [{ label: 'Employees', href: '/en/stores/users', icon: UserCog, requiredPermission: 'canManageEmployees' }],
-  },
 ]
 
 export type SidebarGroup = {
@@ -189,10 +172,15 @@ export type SidebarGroup = {
   }[]
 }
 
-// Every module ends with the owner's account section.
+// Every module ends with the same account section: staff management, your
+// own account (everyone) and the plan (owner only).
 const accountGroup: SidebarGroup = {
   title: 'Account',
-  items: [{ label: 'Plan & billing', href: '/en/billing', icon: Gem, ownerOnly: true }],
+  items: [
+    { label: 'Team', href: '/en/team', icon: UserCog, requiredPermission: 'canManageEmployees' },
+    { label: 'My account', href: '/en/account', icon: CircleUser },
+    { label: 'Plan & billing', href: '/en/billing', icon: Gem, ownerOnly: true },
+  ],
 }
 
 const sidebarItemsByAppType: Record<string, SidebarGroup[]> = {

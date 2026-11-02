@@ -1,9 +1,7 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import React from 'react'
-
-const Page = () => {
-  return <div>Page</div>
+// The store module starts at the overview; staff without reports are sent on
+// to their first allowed page by the middleware.
+export default function StoresPage({ params }: { params: { locale: string } }) {
+  redirect(`/${params.locale}/stores/overview`)
 }
-
-export default Page

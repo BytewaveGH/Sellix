@@ -9,16 +9,25 @@ import { Switch } from '@/components/ui/switch'
 import InputsTemplate from '@/components/templates/inputs'
 import ButtonTemplate from '@/components/templates/button'
 import { useAxios } from '@/hooks/use-axios'
-import { EmployeeServices } from '../../_logics/services'
 import { Check, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { matchingPreset, presetValues, staffModule } from '@/lib/staff-roles'
+import { EmployeeServices, generatePassword, PASSWORD_MIN, passwordProblems } from '@/lib/account'
+import { apiErrorMessage, apiStatus } from '@/lib/api-error'
 
-// ── Single schema — password optional; create-mode is enforced in onSubmit ──
+// The server answers a taken email with a raw unique-constraint 500 today.
+const saveError = (err: unknown) => {
+  const msg = apiErrorMessage(err, '')
+  if (apiStatus(err) === 409 || /unique|duplicate|already/i.test(msg)) return 'Someone on your team already uses this email'
+  if (apiStatus(err) === 402) return 'All staff seats on your plan are in use'
+  return msg || 'Something went wrong'
+}
+
+// Sign-in is by email. The password is set here on create only; existing
+// staff get a new one from Team › Reset password.
 const employeeSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Valid email required'),
-  username: z.string().min(1, 'Username is required'),
   phone: z.string().optional(),
   password: z.string().optional(),
   canViewReports: z.boolean().default(false),
@@ -53,7 +62,6 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
     defaultValues: {
       name: initialData?.name ?? '',
       email: initialData?.email ?? '',
-      username: initialData?.username ?? '',
       phone: initialData?.phone ?? '',
       password: '',
       canViewReports: initialData?.canViewReports ?? false,
@@ -73,7 +81,6 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
     form.reset({
       name: initialData?.name ?? '',
       email: initialData?.email ?? '',
-      username: initialData?.username ?? '',
       phone: initialData?.phone ?? '',
       password: '',
       canViewReports: initialData?.canViewReports ?? false,
@@ -93,22 +100,19 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
   const activePreset = matchingPreset(staff, values)
 
   const onSubmit = async (data: EmployeeForm) => {
-    // Enforce password on create
-    if (mode === 'create' && (!data.password || data.password.length < 6)) {
-      form.setError('password', { message: 'Password must be at least 6 characters' })
-      return
-    }
-    // Enforce minimum length if a new password is provided on update
-    if (mode === 'update' && data.password && data.password.length < 6) {
-      form.setError('password', { message: 'Password must be at least 6 characters' })
-      return
+    if (mode === 'create') {
+      const problem = passwordProblems({ next: data.password ?? '', confirm: data.password ?? '' }, false).next
+      if (problem) {
+        form.setError('password', { message: problem })
+        return
+      }
     }
 
     setSubmitError('')
     setIsSubmitting(true)
     try {
       const payload: any = { ...data }
-      if (mode === 'update' && !payload.password) delete payload.password
+      if (mode === 'update') delete payload.password
 
       if (mode === 'update' && employeeId) {
         await request(EmployeeServices.Update(employeeId, payload))
@@ -118,7 +122,7 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
       form.reset()
       onSuccess?.()
     } catch (err: any) {
-      setSubmitError(err?.response?.data?.message ?? err?.response?.data?.error ?? 'Something went wrong')
+      setSubmitError(saveError(err))
     } finally {
       setIsSubmitting(false)
     }
@@ -133,7 +137,6 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Basic Info</p>
             <div className="flex flex-col gap-3">
               <InputsTemplate control={form.control} name="name" label="Full Name" placeholder="e.g. Kwame Mensah" isRequired />
-              <InputsTemplate control={form.control} name="username" label="Username" placeholder="e.g. kwame.mensah" isRequired />
               <InputsTemplate
                 control={form.control}
                 name="email"
@@ -143,14 +146,28 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
                 inputType="email"
               />
               <InputsTemplate control={form.control} name="phone" label="Phone" placeholder="e.g. +233 24 000 0000" inputType="tel" />
-              <InputsTemplate
-                control={form.control}
-                name="password"
-                label={mode === 'update' ? 'New Password (leave blank to keep)' : 'Password'}
-                placeholder="Min 6 characters"
-                isRequired={mode === 'create'}
-                isPassword
-              />
+              {mode === 'create' && (
+                <div className="flex flex-col gap-1">
+                  <InputsTemplate
+                    control={form.control}
+                    name="password"
+                    label="Password"
+                    placeholder={`At least ${PASSWORD_MIN} characters, with a number`}
+                    isRequired
+                    isPassword
+                  />
+                  <button
+                    type="button"
+                    onClick={() => form.setValue('password', generatePassword(), { shouldDirty: true })}
+                    className="self-start text-xs font-semibold text-endeavour hover:underline"
+                  >
+                    Suggest a password
+                  </button>
+                  <p className="text-[11px] text-gray-400">
+                    They sign in with their email and this password, and can change it in My account.
+                  </p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -204,7 +221,9 @@ const CreateEmployee = ({ appType, mode = 'create', employeeId, initialData, onS
                           <Icon className="h-3.5 w-3.5" />
                         </span>
                         <div className="min-w-0">
-                          <FormLabel className="block text-sm text-stone-700 font-medium cursor-pointer leading-tight m-0">{label}</FormLabel>
+                          <FormLabel className="block text-sm text-stone-700 font-medium cursor-pointer leading-tight m-0">
+                            {label}
+                          </FormLabel>
                           <p className="text-[11px] text-gray-400 leading-snug mt-0.5">{description}</p>
                         </div>
                       </div>

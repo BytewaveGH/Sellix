@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Search, Plus, Minus, Trash2, ShoppingCart, Package, X, Zap, ScanLine, Barcode, CheckCircle2 } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, Package, X, Zap, ScanLine, Barcode, CheckCircle2, Printer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PopoverTemplate } from '@/components/templates/popover'
 import { Sheet, SheetContent, SheetClose } from '@/components/ui/sheet'
@@ -22,6 +22,9 @@ import { RECOGNITION_CONFIG } from '../_logics/scanner/config'
 import { RecognitionError } from '../_logics/scanner/recognition'
 import { useRecognitionRequests } from '../_logics/scanner/use-recognition-requests'
 import ProductScanner from './scanner/product-scanner'
+import { formatPhone, MOMO_NETWORKS, useStoreSettings } from '@/lib/store/settings'
+import { saleToOrder } from '@/lib/store/orders'
+import { printOrder } from '@/lib/store/receipt'
 import { useRecognitionFlow } from './scanner/use-recognition-flow'
 
 // ── Pricing helpers ─────────────────────────────────────────────────────────
@@ -307,6 +310,25 @@ const Main = () => {
   const [checkoutError, setCheckoutError] = useState<{ message: string; productId?: string } | null>(null)
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null)
 
+  // Store settings: starting warehouse and prices, payment methods, receipts.
+  const { settings: storeSettings, loaded: settingsLoaded } = useStoreSettings()
+  const appliedDefaults = useRef(false)
+  useEffect(() => {
+    if (!settingsLoaded || appliedDefaults.current) return
+    appliedDefaults.current = true
+    if (storeSettings.pos.defaultWarehouseId) setWarehouseId((w) => w || storeSettings.pos.defaultWarehouseId!)
+    setCustomerType(storeSettings.pos.defaultCustomerType)
+  }, [settingsLoaded, storeSettings])
+  const pay = storeSettings.payments
+  const momoHint = pay.momoNumber
+    ? `${MOMO_NETWORKS.find((n) => n.value === pay.momoNetwork)?.label ?? 'MoMo'} ${formatPhone(pay.momoNumber)}${pay.momoName ? ` · ${pay.momoName}` : ''}`
+    : ''
+  const printReceipt = (r: SaleReceipt) =>
+    printOrder(
+      saleToOrder({ ...r, employeeName: session?.user?.username, warehouseName: warehouses.find((w: any) => w.id === warehouseId)?.name }),
+      storeSettings
+    )
+
   // Refs for alphabetic scroll
   const gridScrollRef = useRef<HTMLDivElement>(null)
   const letterRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -467,6 +489,7 @@ const Main = () => {
       clearCart()
       setCartSheetOpen(false)
       setReceipt(result.receipt)
+      if (storeSettings.receipt.autoPrint) printReceipt(result.receipt)
     } else {
       // 409 / 422 / network: keep the cart so the cashier can adjust.
       setCheckoutError({ message: result.message, productId: result.kind === 'stock' ? result.productId : undefined })
@@ -640,28 +663,35 @@ const Main = () => {
           <span>₵{total.toFixed(2)}</span>
         </div>
         <div className="flex gap-2 mt-1">
-          <button
-            disabled={!canCharge}
-            onClick={() => handleCharge('momo')}
-            className={cn(
-              'flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all',
-              !canCharge
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-endeavour text-white hover:bg-veniceBlue active:scale-[0.97]'
-            )}
-          >
-            {isSubmitting ? 'Processing...' : `MoMo · ₵${total.toFixed(2)}`}
-          </button>
-          <button
-            disabled={!canCharge}
-            onClick={() => handleCharge('cash')}
-            className={cn(
-              'flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all',
-              !canCharge ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700 active:scale-[0.97]'
-            )}
-          >
-            {isSubmitting ? 'Processing...' : `Cash · ₵${total.toFixed(2)}`}
-          </button>
+          {pay.momo && (
+            <button
+              disabled={!canCharge}
+              onClick={() => handleCharge('momo')}
+              className={cn(
+                'flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all',
+                !canCharge
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-endeavour text-white hover:bg-veniceBlue active:scale-[0.97]'
+              )}
+            >
+              {isSubmitting ? 'Processing...' : `MoMo · ₵${total.toFixed(2)}`}
+              {momoHint && !isSubmitting && <span className="block text-[10px] font-normal opacity-80 truncate px-1">{momoHint}</span>}
+            </button>
+          )}
+          {pay.cash && (
+            <button
+              disabled={!canCharge}
+              onClick={() => handleCharge('cash')}
+              className={cn(
+                'flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all',
+                !canCharge
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700 active:scale-[0.97]'
+              )}
+            >
+              {isSubmitting ? 'Processing...' : `Cash · ₵${total.toFixed(2)}`}
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -1029,9 +1059,17 @@ const Main = () => {
               <span>Total</span>
               <span>₵{receipt.totalAmount.toFixed(2)}</span>
             </div>
-            <button onClick={() => setReceipt(null)} className="mt-4 h-12 rounded-2xl bg-endeavour text-white font-semibold">
-              New sale
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => printReceipt(receipt)}
+                className="h-12 flex-1 rounded-2xl border border-gray-200 text-stone-700 font-semibold inline-flex items-center justify-center gap-2 hover:bg-gray-50"
+              >
+                <Printer className="h-4 w-4" /> Print
+              </button>
+              <button onClick={() => setReceipt(null)} className="h-12 flex-[2] rounded-2xl bg-endeavour text-white font-semibold">
+                New sale
+              </button>
+            </div>
           </div>
         </div>
       )}

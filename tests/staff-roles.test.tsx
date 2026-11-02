@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 const sent = vi.hoisted(() => ({ requests: [] as any[] }))
 vi.mock('@/hooks/use-axios', () => ({ useAxios: () => async (config: any) => sent.requests.push(config) }))
 
-import CreateEmployee from '@/app/[locale]/(stores)/stores/users/_widgets/_forms/create-employee'
+import CreateEmployee from '@/components/account/employee-form'
 import { getSidebarItems } from '@/components/generals/layouts/logics/data'
 import { APP_TYPES } from '@/lib/app-type'
 import { PERMISSION_KEYS, STAFF_MODULES, matchingPreset, presetValues, staffModule } from '@/lib/staff-roles'
@@ -65,9 +65,15 @@ describe('employee form', () => {
     expect(screen.getByRole('button', { name: /Kitchen/ }).getAttribute('aria-pressed')).toBe('true')
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Kwame Mensah'), { target: { value: 'Esi Mensah' } })
-    fireEvent.change(screen.getByPlaceholderText('e.g. kwame.mensah'), { target: { value: 'esi' } })
     fireEvent.change(screen.getByPlaceholderText('e.g. kwame@business.com'), { target: { value: 'esi@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Min 6 characters'), { target: { value: 'secret1' } })
+    // Too weak first: at least 8 characters with a number.
+    fireEvent.change(screen.getByPlaceholderText(/At least 8 characters/), { target: { value: 'secret' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add Employee' }))
+    })
+    expect(await screen.findByText('Use at least 8 characters')).toBeTruthy()
+    expect(sent.requests).toHaveLength(0)
+    fireEvent.change(screen.getByPlaceholderText(/At least 8 characters/), { target: { value: 'kitchen24' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add Employee' }))
     })
@@ -75,6 +81,8 @@ describe('employee form', () => {
     expect(sent.requests[0]).toMatchObject({ method: 'POST', url: '/employees/' })
     expect(sent.requests[0].data).toMatchObject({
       name: 'Esi Mensah',
+      email: 'esi@x.com',
+      password: 'kitchen24',
       canManageSales: true,
       canManageStock: true,
       canManageProducts: false,

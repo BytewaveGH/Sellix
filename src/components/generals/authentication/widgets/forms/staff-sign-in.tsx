@@ -91,10 +91,13 @@ export default function StaffSignInForm() {
                   parentClassname="mt-4"
                   placeholder="••••••••"
                 />
+                <p className="bytewave-paragraph text-xs text-gray-400 mt-3">
+                  Forgot your password? Ask the owner or a manager to reset it for you from Team.
+                </p>
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="bg-endeavour text-white text-xs w-full mt-6 hover:bg-veniceBlue h-9 disabled:opacity-60"
+                  className="bg-endeavour text-white text-xs w-full mt-4 hover:bg-veniceBlue h-9 disabled:opacity-60"
                 >
                   {isLoading ? 'Signing in...' : 'Sign In'}
                 </Button>
