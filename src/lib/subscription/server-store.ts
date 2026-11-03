@@ -136,9 +136,13 @@ const tenantFetch = (user: TenantUser, p: string, init: RequestInit = {}) =>
 export const apiStore = (): BillingStore => ({
   catalog: async () => unwrap(await platformFetch('/platform/billing/catalog'), 'Couldn’t load plans'),
   saveCatalog: async (input) =>
-    unwrap(await platformFetch('/platform/billing/catalog', { method: 'PUT', body: JSON.stringify(parseCatalog(input)) }), 'Couldn’t save plans'),
+    unwrap(
+      await platformFetch('/platform/billing/catalog', { method: 'PUT', body: JSON.stringify(parseCatalog(input)) }),
+      'Couldn’t save plans'
+    ),
   list: async () => (await unwrap<Subscription[]>(await platformFetch('/platform/subscriptions'), 'Couldn’t load subscriptions')) ?? [],
-  get: async (id) => (await unwrap<Subscription | null>(await platformFetch(`/platform/tenants/${id}/subscription`), 'Couldn’t load subscription')) ?? null,
+  get: async (id) =>
+    (await unwrap<Subscription | null>(await platformFetch(`/platform/tenants/${id}/subscription`), 'Couldn’t load subscription')) ?? null,
   act: async (id, action) =>
     unwrap(
       await platformFetch(`/platform/tenants/${id}/subscription/actions`, { method: 'POST', body: JSON.stringify(parseAction(action)) }),
@@ -146,7 +150,10 @@ export const apiStore = (): BillingStore => ({
     ),
   forTenant: async (user) => unwrap(await tenantFetch(user, '/billing'), 'Couldn’t load billing'),
   actForTenant: async (user, action) =>
-    unwrap(await tenantFetch(user, '/billing/actions', { method: 'POST', body: JSON.stringify(parseAction(action)) }), 'Couldn’t send request'),
+    unwrap(
+      await tenantFetch(user, '/billing/actions', { method: 'POST', body: JSON.stringify(parseAction(action)) }),
+      'Couldn’t send request'
+    ),
 })
 
 export const billingStore = (): BillingStore => (process.env.BILLING_STORE === 'file' ? fileStore() : apiStore())

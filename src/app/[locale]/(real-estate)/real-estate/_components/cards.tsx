@@ -12,6 +12,7 @@ import type { PropertyStats, TenancyRow } from '../_logics/selectors'
 import type { Property } from '../_logics/types'
 import { Avatar, Badge, Card, OccupancyBar, PropertyCover, RENT } from './ui'
 import { useLocaleHref } from './module-frame'
+import { propertyPhotos } from '../_logics/site'
 
 const TITLE_SHORT: Record<string, string> = {
   none: 'None yet',
@@ -34,7 +35,7 @@ export const PropertyCard = ({ property, stats }: { property: Property; stats: P
     >
       <Card className="overflow-hidden transition-all group-hover:shadow-[0_8px_24px_-12px_rgba(8,101,172,0.35)] group-hover:border-endeavour/30">
         <div className="relative">
-          <PropertyCover src={property.coverImageUrl} name={property.name} className="h-32 w-full" />
+          <PropertyCover src={propertyPhotos(property)[0]} name={property.name} className="h-32 w-full" />
           <span className="absolute top-3 left-3 rounded-full bg-white/90 backdrop-blur px-2.5 py-1 text-[11px] font-bold text-stone-700">
             {propertyTypeLabel(property.type)}
           </span>

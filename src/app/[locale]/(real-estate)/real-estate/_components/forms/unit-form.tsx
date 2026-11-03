@@ -82,6 +82,8 @@ export const UnitForm = ({
       nightlyRate: mode === 'short-stay' ? toNum(v.nightlyRate) : 0,
       maxGuests: mode === 'short-stay' ? toNum(v.maxGuests) : 0,
       notes: v.notes || undefined,
+      // Set on the Website page; kept as they are.
+      photos: unit?.photos,
     }
     try {
       if (unit) await actions.update('units', unit.id, body)
@@ -166,7 +168,7 @@ export const UnitForm = ({
               </Field>
             </FormGrid>
           )}
-          <Field label="Availability">
+          <Field label="Availability" hint="Only available units can appear on your website">
             <Segmented
               ariaLabel="Availability"
               value={availability}

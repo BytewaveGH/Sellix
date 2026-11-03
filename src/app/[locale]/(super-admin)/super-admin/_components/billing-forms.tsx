@@ -54,7 +54,17 @@ const useSaving = () => {
 
 // ── Plan ─────────────────────────────────────────────────────────────────────
 
-const PlanPicker = ({ plans, value, onChange, cycle }: { plans: Plan[]; value: string; onChange: (id: string) => void; cycle: BillingCycle }) => (
+const PlanPicker = ({
+  plans,
+  value,
+  onChange,
+  cycle,
+}: {
+  plans: Plan[]
+  value: string
+  onChange: (id: string) => void
+  cycle: BillingCycle
+}) => (
   <div role="radiogroup" aria-label="Plan" className="flex flex-col gap-2">
     {plans.map((p) => {
       const on = p.id === value
@@ -219,7 +229,10 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
     periods,
     paidAt,
   }
-  const result = useMemo(() => (sub ? preview(sub, tenant.id, action, catalog) : null), [sub, tenant.id, catalog, periods, amount, method, paidAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  const result = useMemo(
+    () => (sub ? preview(sub, tenant.id, action, catalog) : null),
+    [sub, tenant.id, catalog, periods, amount, method, paidAt]
+  ) // eslint-disable-line react-hooks/exhaustive-deps
   const valid = !!sub && amount !== '' && toNum(amount, -1) >= 0 && !!paidOn && !!result
 
   return (
@@ -234,7 +247,12 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
             Cancel
           </Button>
           <Button
-            onClick={() => run(() => actions.act(tenant.id, action, `Payment recorded for ${tenant.name}`), () => onOpenChange(false))}
+            onClick={() =>
+              run(
+                () => actions.act(tenant.id, action, `Payment recorded for ${tenant.name}`),
+                () => onOpenChange(false)
+              )
+            }
             loading={saving}
             disabled={!valid}
           >
@@ -253,7 +271,11 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
           />
         </Field>
         <FormGrid>
-          <Field label="Amount received" hint={plan ? `${plan.name}: ${cedis(priceFor(plan, cycle))} per ${cycleLabel(cycle)}` : undefined} htmlFor="pay-amount">
+          <Field
+            label="Amount received"
+            hint={plan ? `${plan.name}: ${cedis(priceFor(plan, cycle))} per ${cycleLabel(cycle)}` : undefined}
+            htmlFor="pay-amount"
+          >
             <Input
               id="pay-amount"
               type="number"
@@ -282,7 +304,9 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
                 onClick={() => setMethod(m)}
                 className={cn(
                   'h-9 px-3.5 rounded-xl border text-xs font-semibold transition-colors',
-                  method === m ? 'border-endeavour bg-endeavour/[0.06] text-endeavour' : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                  method === m
+                    ? 'border-endeavour bg-endeavour/[0.06] text-endeavour'
+                    : 'border-stone-200 text-stone-600 hover:border-stone-300'
                 )}
               >
                 {METHOD_LABELS[m]}
@@ -330,7 +354,16 @@ export const ExtendDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Drawe
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => run(() => actions.act(tenant.id, action, `${tenant.name} extended by ${n} days`), () => onOpenChange(false))} loading={saving} disabled={!result}>
+          <Button
+            onClick={() =>
+              run(
+                () => actions.act(tenant.id, action, `${tenant.name} extended by ${n} days`),
+                () => onOpenChange(false)
+              )
+            }
+            loading={saving}
+            disabled={!result}
+          >
             Extend
           </Button>
         </>
@@ -383,7 +416,12 @@ export const CancelDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Drawe
             loading={saving}
             onClick={() =>
               run(
-                () => actions.act(tenant.id, { type: 'cancel', atPeriodEnd: when === 'end' }, when === 'end' ? `${tenant.name} won’t renew` : `${tenant.name} canceled`),
+                () =>
+                  actions.act(
+                    tenant.id,
+                    { type: 'cancel', atPeriodEnd: when === 'end' },
+                    when === 'end' ? `${tenant.name} won’t renew` : `${tenant.name} canceled`
+                  ),
                 () => onOpenChange(false)
               )
             }

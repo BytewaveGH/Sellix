@@ -52,7 +52,13 @@ export default function BillingPage() {
     )
   }
   if (!billing.isOwner) {
-    return <EmptyState icon={ShieldCheck} title="Only the owner manages the plan" description="Ask the business owner about plans and payments." />
+    return (
+      <EmptyState
+        icon={ShieldCheck}
+        title="Only the owner manages the plan"
+        description="Ask the business owner about plans and payments."
+      />
+    )
   }
 
   const sendRequest = async () => {
@@ -192,7 +198,9 @@ export default function BillingPage() {
                   <span className="text-sm text-stone-500"> /{cycleLabel(cycle)}</span>
                 </p>
                 <p className="text-[11px] text-stone-400 h-4">
-                  {cycle === 'yearly' && p.monthlyPrice > 0 ? `${cedis(Math.round(monthlyEquivalent(p, 'yearly')))}/month, billed yearly` : ''}
+                  {cycle === 'yearly' && p.monthlyPrice > 0
+                    ? `${cedis(Math.round(monthlyEquivalent(p, 'yearly')))}/month, billed yearly`
+                    : ''}
                 </p>
                 <ul className="mt-4 flex flex-col gap-2 text-sm flex-1">
                   <li className="flex items-center gap-2 text-stone-700">
@@ -200,7 +208,8 @@ export default function BillingPage() {
                     {p.limits.staff === null ? 'Unlimited staff accounts' : `Up to ${p.limits.staff} staff accounts`}
                   </li>
                   <li className="flex items-center gap-2 text-stone-700">
-                    <Check className="h-4 w-4 text-emerald-600 flex-shrink-0" /> Everything in the core {verticalMeta(appType).short.toLowerCase()} app
+                    <Check className="h-4 w-4 text-emerald-600 flex-shrink-0" /> Everything in the core{' '}
+                    {verticalMeta(appType).short.toLowerCase()} app
                   </li>
                   {moduleFeatures.map((f) => {
                     const on = p.features.includes(f.key)

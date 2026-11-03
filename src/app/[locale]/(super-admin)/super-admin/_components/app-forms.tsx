@@ -445,8 +445,8 @@ export const RegisterAppWizard = ({
             </p>
           ) : !catalog.data ? (
             <div role="alert" className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> Plans can’t be loaded, so this app will be registered without one. You
-              can set it later.
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> Plans can’t be loaded, so this app will be registered without one.
+              You can set it later.
             </div>
           ) : (
             <>
@@ -461,7 +461,12 @@ export const RegisterAppWizard = ({
               />
               <div role="radiogroup" aria-label="Plan" className="flex flex-col gap-2">
                 {[
-                  ...offered.map((p) => ({ id: p.id, title: p.name, body: p.tagline, price: `${cedis(priceFor(p, cycle))}/${cycleLabel(cycle)}` })),
+                  ...offered.map((p) => ({
+                    id: p.id,
+                    title: p.name,
+                    body: p.tagline,
+                    price: `${cedis(priceFor(p, cycle))}/${cycleLabel(cycle)}`,
+                  })),
                   { id: '', title: 'No plan', body: 'Free, full access — for partners or internal use', price: '' },
                 ].map((o) => {
                   const on = planId === o.id
@@ -493,10 +498,22 @@ export const RegisterAppWizard = ({
               </div>
               {plan && (
                 <div className="rounded-2xl border border-stone-200 p-4 flex flex-col gap-3">
-                  <Toggle checked={trial} onChange={setTrial} label="Start with a free trial" hint="Full access, no payment until it ends" />
+                  <Toggle
+                    checked={trial}
+                    onChange={setTrial}
+                    label="Start with a free trial"
+                    hint="Full access, no payment until it ends"
+                  />
                   {trial ? (
                     <Field label="Trial length (days)" htmlFor="ra-trial">
-                      <Input id="ra-trial" type="number" min={1} max={365} value={trialDays} onChange={(e) => setTrialDays(e.target.value)} />
+                      <Input
+                        id="ra-trial"
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={trialDays}
+                        onChange={(e) => setTrialDays(e.target.value)}
+                      />
                     </Field>
                   ) : (
                     <p className="text-xs text-stone-500">Payment is due now — record it from the app’s Billing tab.</p>

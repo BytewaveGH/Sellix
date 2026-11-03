@@ -12,7 +12,7 @@ Each tenant has a business type (`appType`) that decides which module it gets.
 | **Eatery**      | **Customers** (public site at `/eat`): a directory and a branded storefront per restaurant; order for pickup, delivery or dine-in (table QR codes); pay by cash, MoMo or at the table; live order tracking. **Owners**: overview with profit, live order board, counter POS with receipts, menu (options, combos, timed availability, deals), ingredients with pack sizes, recipes and packaging, stock and waste, expenses, sales history with daily totals, CSV export and end-of-day reports, brand and theme editor (18 design styles, contrast checks), settings. |
 | **Real estate** | Properties and land, configurable room types, tenants, leases, rent and arrears, short-stay bookings, maintenance, building projects with phase costs, documents shareable on WhatsApp.                                                                                                                                                                                                                                                                                                                                                                                |
 | **Amusement**   | Attractions, tickets, bookings, and a public leaderboard.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **Super admin** | Register businesses and choose their type and plan, suspend or delete them, platform stats. **Billing**: recurring revenue, payments collected, overdue businesses and plan requests. **Plans**: prices, staff limits and a feature matrix across every module.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Super admin** | Register businesses and choose their type and plan, suspend or delete them, platform stats. **Billing**: recurring revenue, payments collected, overdue businesses and plan requests. **Plans**: prices, staff limits and a feature matrix across every module.                                                                                                                                                                                                                                                                                                        |
 
 Across all modules:
 
@@ -24,10 +24,10 @@ Across all modules:
 
 ## Status
 
-| Module              | Data                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Retail, Amusement   | Live Sellix backend                                                                                                                               |
-| Real estate, Eatery | Complete in the frontend, saved in the browser until their backend endpoints exist ([BACKEND_REQUIREMENTS.md](BACKEND_REQUIREMENTS.md) §6 and §7) |
+| Module              | Data                                                                                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Retail, Amusement   | Live Sellix backend                                                                                                                                        |
+| Real estate, Eatery | Complete in the frontend, saved in the browser until their backend endpoints exist ([BACKEND_REQUIREMENTS.md](BACKEND_REQUIREMENTS.md) §6 and §7)          |
 | Billing             | Complete in the frontend, saved in a JSON file on the Next.js server until the backend endpoints exist (§8). Access is enforced in the UI only until then. |
 
 Browser mode keeps data in one browser only. For the eatery, that includes customers' orders, so to try ordering, open the storefront and the dashboard in two tabs of the same browser.
@@ -56,13 +56,13 @@ Then open http://localhost:3000.
 
 ### Environment (`.env.local`)
 
-| Variable                              | Purpose                                                                                |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`                 | Sellix backend base URL, e.g. `https://apis.sellix.example.com/api`                    |
-| `NEXT_PUBLIC_ROOT_DOMAIN`             | Optional. On the root domain only the app picker is reachable; tenants use subdomains. |
-| `NEXT_PUBLIC_REAL_ESTATE_DATA_SOURCE` | `local` (browser) or `api` (default)                                                   |
-| `NEXT_PUBLIC_EATERY_DATA_SOURCE`      | `local` (browser) or `api` (default)                                                   |
-| `BILLING_STORE`                       | `file` (JSON on this server) or `api` (default). Server-only.                           |
+| Variable                              | Purpose                                                                                                     |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`                 | Sellix backend base URL, e.g. `https://apis.sellix.example.com/api`                                         |
+| `NEXT_PUBLIC_ROOT_DOMAIN`             | Optional. On the root domain only the app picker is reachable; tenants use subdomains.                      |
+| `NEXT_PUBLIC_REAL_ESTATE_DATA_SOURCE` | `local` (browser) or `api` (default)                                                                        |
+| `NEXT_PUBLIC_EATERY_DATA_SOURCE`      | `local` (browser) or `api` (default)                                                                        |
+| `BILLING_STORE`                       | `file` (JSON on this server) or `api` (default). Server-only.                                               |
 | `BILLING_FILE`                        | Optional. Where `file` keeps billing; default `.data/billing.json`. Needs a writable disk (not serverless). |
 
 Other auth settings are in `.env.local`. `NEXT_PUBLIC_*` values are read when the server starts, so restart `npm run dev` after changing them.

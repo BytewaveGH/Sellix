@@ -9,7 +9,18 @@
 
 import type { AxiosRequestConfig } from 'axios'
 import { ALL_PRIVATE, ALL_SHARED, LEGACY_UNIT_TYPE_LABELS } from './constants'
-import type { DocumentRecord, ResourceMap, ResourceName, Unit, UnitType } from './types'
+import {
+  acceptBookingRequest,
+  directoryEntries,
+  publicSite,
+  withSiteDefaults,
+  type BookingRequest,
+  type DirectoryListing,
+  type PublicSite,
+  type SiteSettings,
+} from './site'
+import { toISODate } from './calc'
+import type { Booking, DocumentRecord, ResourceMap, ResourceName, Unit, UnitType } from './types'
 
 export type DataSourceKind = 'api' | 'local'
 
@@ -28,6 +39,21 @@ export interface DataSource {
   getFile(doc: DocumentRecord): Promise<Blob>
   // A time-limited link others can open (API only; local files can't be linked).
   shareLink(doc: DocumentRecord): Promise<string | null>
+  // Public website settings, and website photos (resolves to the image's link).
+  getSite(): Promise<SiteSettings>
+  saveSite(site: SiteSettings): Promise<SiteSettings>
+  uploadImage(image: Blob): Promise<string>
+}
+
+// What anyone can read without signing in, for one business (its tenant slug).
+export interface PublicSiteSource {
+  kind: DataSourceKind
+  // null when the business has no published site.
+  site(slug: string): Promise<PublicSite | null>
+  // A short-stay booking request; lands on the owner's Bookings page as an inquiry.
+  requestBooking(slug: string, request: BookingRequest): Promise<{ received: true }>
+  // Free rooms of every published site that opted into the directory.
+  directory(): Promise<DirectoryListing[]>
 }
 
 export type DocumentDraft = Omit<DocumentRecord, 'id' | 'uploadedAt' | 'fileName' | 'mimeType' | 'size'>
@@ -65,6 +91,23 @@ export const RealEstateServices = {
   UploadDocument: (form: FormData): AxiosRequestConfig => ({ method: 'POST', url: `/real-estate/documents/`, data: form }),
   DocumentFile: (id: number): AxiosRequestConfig => ({ method: 'GET', url: `/real-estate/documents/${id}/file`, responseType: 'blob' }),
   DocumentShareLink: (id: number): AxiosRequestConfig => ({ method: 'POST', url: `/real-estate/documents/${id}/share-link` }),
+  Site: (): AxiosRequestConfig => ({ method: 'GET', url: '/real-estate/site' }),
+  SaveSite: (data: SiteSettings): AxiosRequestConfig => ({ method: 'PUT', url: '/real-estate/site', data }),
+  UploadImage: (form: FormData): AxiosRequestConfig => ({ method: 'POST', url: '/real-estate/images', data: form }),
+  // Public; the business is picked by the X-Tenant-Domain header.
+  PublicSite: (slug: string): AxiosRequestConfig => ({
+    method: 'GET',
+    url: '/public/real-estate/site',
+    headers: { 'X-Tenant-Domain': slug },
+  }),
+  // Across businesses: no tenant header.
+  Directory: (): AxiosRequestConfig => ({ method: 'GET', url: '/public/real-estate/directory' }),
+  BookingRequest: (slug: string, data: BookingRequest): AxiosRequestConfig => ({
+    method: 'POST',
+    url: '/public/real-estate/booking-requests',
+    headers: { 'X-Tenant-Domain': slug },
+    data,
+  }),
 }
 
 const unwrap = (res: any) => res?.data?.data ?? res?.data
@@ -88,6 +131,43 @@ export const createApiSource = (request: (c: AxiosRequestConfig) => Promise<any>
   },
   getFile: async (doc) => (await request(RealEstateServices.DocumentFile(doc.id))).data as Blob,
   shareLink: async (doc) => unwrap(await request(RealEstateServices.DocumentShareLink(doc.id)))?.url ?? null,
+  getSite: async () => {
+    try {
+      return withSiteDefaults(unwrap(await request(RealEstateServices.Site())))
+    } catch (err: any) {
+      // Never set up yet.
+      if (err?.response?.status === 404) return withSiteDefaults(null)
+      throw err
+    }
+  },
+  saveSite: async (site) => withSiteDefaults(unwrap(await request(RealEstateServices.SaveSite(site)))),
+  uploadImage: async (image) => {
+    const form = new FormData()
+    form.append('file', image, `photo.${image.type === 'image/webp' ? 'webp' : 'jpg'}`)
+    const url = unwrap(await request(RealEstateServices.UploadImage(form)))?.url
+    if (!url) throw new Error('The upload didn’t return a link')
+    return url
+  },
+})
+
+export const createApiPublicSource = (request: (c: AxiosRequestConfig) => Promise<any>): PublicSiteSource => ({
+  kind: 'api',
+  site: async (slug) => {
+    try {
+      return unwrap(await request(RealEstateServices.PublicSite(slug))) ?? null
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null
+      throw err
+    }
+  },
+  requestBooking: async (slug, data) => {
+    await request(RealEstateServices.BookingRequest(slug, data))
+    return { received: true }
+  },
+  directory: async () => {
+    const data = unwrap(await request(RealEstateServices.Directory()))
+    return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+  },
 })
 
 // ── File storage for local mode (IndexedDB — localStorage is far too small) ──
@@ -143,6 +223,14 @@ export const setLocalFileStore = (store: FileStore | null) => {
   sharedFileStore = store
 }
 
+const blobToDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result))
+    r.onerror = () => reject(r.error ?? new Error('Couldn’t read the image'))
+    r.readAsDataURL(blob)
+  })
+
 // ── Local (browser) ──────────────────────────────────────────────────────────
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
@@ -153,7 +241,7 @@ export const createLocalSource = (
   files: FileStore | null = getLocalFileStore()
 ): DataSource => {
   const fileKey = (id: number) => `${scope}:${id}`
-  const key = (r: ResourceName) => `sellix-real-estate:${scope}:${r}`
+  const key = (r: ResourceName | 'site') => `sellix-real-estate:${scope}:${r}`
   const read = <R extends ResourceName>(r: R): ResourceMap[R][] => {
     try {
       const raw = storage?.getItem(key(r))
@@ -162,7 +250,15 @@ export const createLocalSource = (
       return []
     }
   }
-  const write = (r: ResourceName, rows: unknown[]) => storage?.setItem(key(r), JSON.stringify(rows))
+  const write = (r: ResourceName | 'site', rows: unknown) => {
+    try {
+      storage?.setItem(key(r), JSON.stringify(rows))
+    } catch (err) {
+      if ((err as DOMException)?.name === 'QuotaExceededError')
+        throw new Error('This browser’s storage is full. Remove some photos or documents and try again.')
+      throw err
+    }
+  }
   const nextId = (rows: { id: number }[]) => rows.reduce((m, x) => Math.max(m, x.id), 0) + 1
 
   // Same shape as an axios error so callers handle local and API errors alike.
@@ -315,5 +411,66 @@ export const createLocalSource = (
       return blob
     },
     shareLink: async () => null,
+    getSite: async () => {
+      try {
+        const raw = storage?.getItem(key('site'))
+        return withSiteDefaults(raw ? JSON.parse(raw) : null)
+      } catch {
+        return withSiteDefaults(null)
+      }
+    },
+    saveSite: async (site) => {
+      const saved = withSiteDefaults(site)
+      write('site', saved)
+      return saved
+    },
+    // Kept inside the record that uses it, as a data URL.
+    uploadImage: async (image) => blobToDataUrl(image),
+  }
+}
+
+// Local mode: the business's data in this browser, read with no sign-in. Only
+// works on the device the owner uses — fine for trying the site out.
+export const createLocalPublicSource = (
+  storage: StorageLike | null = typeof window === 'undefined' ? null : window.localStorage,
+  clock: () => string = () => toISODate(new Date()),
+  // Every key in `storage`, to find the businesses saved in this browser.
+  keys: () => string[] = () => (typeof window === 'undefined' ? [] : Object.keys(window.localStorage))
+): PublicSiteSource => {
+  const sourceFor = (slug: string) => createLocalSource(slug, storage, null)
+  const load = async (slug: string) => {
+    const src = sourceFor(slug)
+    const [settings, unitTypes, properties, units, leases, bookings] = await Promise.all([
+      src.getSite(),
+      src.list('unitTypes'),
+      src.list('properties'),
+      src.list('units'),
+      src.list('leases'),
+      src.list('bookings'),
+    ])
+    return { src, settings, data: { unitTypes, properties, units, leases, bookings } }
+  }
+  const site = async (slug: string) => {
+    const { settings, data } = await load(slug)
+    return publicSite(slug, settings, data, clock())
+  }
+  return {
+    kind: 'local',
+    site,
+    directory: async () => {
+      const slugs = keys()
+        .map((k) => /^sellix-real-estate:(.+):site$/.exec(k)?.[1])
+        .filter((s): s is string => !!s)
+      const sites = await Promise.all(slugs.map(site))
+      return sites.flatMap((s) => (s ? directoryEntries(s) : []))
+    },
+    requestBooking: async (slug, request) => {
+      const { src, settings, data } = await load(slug)
+      const res = acceptBookingRequest(slug, settings, data, request, clock())
+      if (!res.ok)
+        throw Object.assign(new Error(res.message), { response: { status: res.status, data: { status: false, error: res.message } } })
+      await src.create('bookings', res.booking as Omit<Booking, 'id'>)
+      return { received: true }
+    },
   }
 }

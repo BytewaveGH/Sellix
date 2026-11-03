@@ -45,7 +45,13 @@ const PlanDrawer = ({
   }, [plan, isNew])
 
   const set = <K extends keyof Plan>(k: K, v: Plan[K]) => setP((cur) => ({ ...cur, [k]: v }))
-  const idError = !p.id ? 'Needed' : !/^[a-z0-9][a-z0-9-]{0,39}$/.test(p.id) ? 'Lowercase letters, numbers and dashes' : isNew && takenIds.includes(p.id) ? 'Already used' : ''
+  const idError = !p.id
+    ? 'Needed'
+    : !/^[a-z0-9][a-z0-9-]{0,39}$/.test(p.id)
+      ? 'Lowercase letters, numbers and dashes'
+      : isNew && takenIds.includes(p.id)
+        ? 'Already used'
+        : ''
   const valid = p.name.trim().length > 0 && !idError
   const saving = yearlySavings(p)
 
@@ -73,7 +79,12 @@ const PlanDrawer = ({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={!valid} onClick={() => onApply({ ...p, name: p.name.trim(), tagline: p.tagline.trim(), limits: { staff: unlimited ? null : p.limits.staff } })}>
+          <Button
+            disabled={!valid}
+            onClick={() =>
+              onApply({ ...p, name: p.name.trim(), tagline: p.tagline.trim(), limits: { staff: unlimited ? null : p.limits.staff } })
+            }
+          >
             Apply
           </Button>
         </>
@@ -89,7 +100,12 @@ const PlanDrawer = ({
               onChange={(e) => setP((cur) => ({ ...cur, name: e.target.value, id: idTouched ? cur.id : slugify(e.target.value) }))}
             />
           </Field>
-          <Field label="Plan id" hint={isNew ? 'Used in the API; can’t change later' : 'Can’t be changed'} error={isNew ? idError : undefined} htmlFor="plan-id">
+          <Field
+            label="Plan id"
+            hint={isNew ? 'Used in the API; can’t change later' : 'Can’t be changed'}
+            error={isNew ? idError : undefined}
+            htmlFor="plan-id"
+          >
             <Input
               id="plan-id"
               value={p.id}
@@ -106,14 +122,32 @@ const PlanDrawer = ({
         </Field>
         <FormGrid>
           <Field label="Monthly price" htmlFor="plan-monthly">
-            <Input id="plan-monthly" type="number" min={0} prefix="₵" value={p.monthlyPrice} onChange={(e) => set('monthlyPrice', Math.max(0, toNum(e.target.value)))} />
+            <Input
+              id="plan-monthly"
+              type="number"
+              min={0}
+              prefix="₵"
+              value={p.monthlyPrice}
+              onChange={(e) => set('monthlyPrice', Math.max(0, toNum(e.target.value)))}
+            />
           </Field>
           <Field
             label="Yearly price"
-            hint={saving > 0 ? `Saves ${cedis(saving)} (${Math.round((saving / Math.max(1, p.monthlyPrice * 12)) * 100)}%)` : 'Same as 12 months'}
+            hint={
+              saving > 0
+                ? `Saves ${cedis(saving)} (${Math.round((saving / Math.max(1, p.monthlyPrice * 12)) * 100)}%)`
+                : 'Same as 12 months'
+            }
             htmlFor="plan-yearly"
           >
-            <Input id="plan-yearly" type="number" min={0} prefix="₵" value={p.yearlyPrice} onChange={(e) => set('yearlyPrice', Math.max(0, toNum(e.target.value)))} />
+            <Input
+              id="plan-yearly"
+              type="number"
+              min={0}
+              prefix="₵"
+              value={p.yearlyPrice}
+              onChange={(e) => set('yearlyPrice', Math.max(0, toNum(e.target.value)))}
+            />
           </Field>
         </FormGrid>
         <FormGrid>
@@ -129,16 +163,29 @@ const PlanDrawer = ({
             />
           </Field>
           <Field label="Free trial (days)" hint="0 = no trial" htmlFor="plan-trial">
-            <Input id="plan-trial" type="number" min={0} max={365} value={p.trialDays} onChange={(e) => set('trialDays', Math.max(0, Math.round(toNum(e.target.value))))} />
+            <Input
+              id="plan-trial"
+              type="number"
+              min={0}
+              max={365}
+              value={p.trialDays}
+              onChange={(e) => set('trialDays', Math.max(0, Math.round(toNum(e.target.value))))}
+            />
           </Field>
         </FormGrid>
         <div className="rounded-2xl border border-stone-200 p-4 flex flex-col gap-4">
           <Toggle checked={unlimited} onChange={setUnlimited} label="Unlimited staff" />
-          <Toggle checked={!!p.highlighted} onChange={(v) => set('highlighted', v)} label="Mark as most popular" hint="Highlighted on owners’ plan comparison" />
+          <Toggle
+            checked={!!p.highlighted}
+            onChange={(v) => set('highlighted', v)}
+            label="Mark as most popular"
+            hint="Highlighted on owners’ plan comparison"
+          />
         </div>
         {!isNew && subscribers > 0 && (
           <p className="text-xs text-stone-500">
-            {subscribers} business{subscribers === 1 ? ' is' : 'es are'} on this plan, so it can be archived (hidden from new choices) but not deleted.
+            {subscribers} business{subscribers === 1 ? ' is' : 'es are'} on this plan, so it can be archived (hidden from new choices) but
+            not deleted.
           </p>
         )}
       </div>
@@ -204,10 +251,12 @@ export default function PlansPage() {
     )
   }
 
-  const updatePlan = (id: string, fn: (p: Plan) => Plan) => setDraft((d) => d && { ...d, plans: d.plans.map((p) => (p.id === id ? fn(p) : p)) })
+  const updatePlan = (id: string, fn: (p: Plan) => Plan) =>
+    setDraft((d) => d && { ...d, plans: d.plans.map((p) => (p.id === id ? fn(p) : p)) })
   const toggleFeature = (planId: string, key: FeatureKey) =>
     updatePlan(planId, (p) => ({ ...p, features: p.features.includes(key) ? p.features.filter((f) => f !== key) : [...p.features, key] }))
-  const setSetting = <K extends keyof Catalog['settings']>(k: K, v: Catalog['settings'][K]) => setDraft((d) => d && { ...d, settings: { ...d.settings, [k]: v } })
+  const setSetting = <K extends keyof Catalog['settings']>(k: K, v: Catalog['settings'][K]) =>
+    setDraft((d) => d && { ...d, settings: { ...d.settings, [k]: v } })
 
   const save = async () => {
     setSaving(true)
@@ -227,7 +276,14 @@ export default function PlansPage() {
       {/* Plans */}
       <div className={cn('grid gap-4', draft.plans.length >= 3 ? 'md:grid-cols-2 xl:grid-cols-3' : 'md:grid-cols-2')}>
         {draft.plans.map((p) => (
-          <Card key={p.id} className={cn('p-5 flex flex-col', p.archived && 'opacity-60', p.highlighted && !p.archived && 'ring-2 ring-endeavour/60 border-transparent')}>
+          <Card
+            key={p.id}
+            className={cn(
+              'p-5 flex flex-col',
+              p.archived && 'opacity-60',
+              p.highlighted && !p.archived && 'ring-2 ring-endeavour/60 border-transparent'
+            )}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-base font-extrabold text-stone-900 flex items-center gap-1.5">
@@ -236,7 +292,13 @@ export default function PlansPage() {
                 </p>
                 <p className="text-xs text-stone-500 truncate">{p.tagline || '—'}</p>
               </div>
-              <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setEditing({ plan: p, isNew: false })} aria-label={`Edit ${p.name}`}>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={Pencil}
+                onClick={() => setEditing({ plan: p, isNew: false })}
+                aria-label={`Edit ${p.name}`}
+              >
                 Edit
               </Button>
             </div>
@@ -257,7 +319,11 @@ export default function PlansPage() {
                 </div>
               ))}
             </dl>
-            {p.archived && <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-stone-500 inline-flex items-center gap-1"><Archive className="h-3 w-3" /> Archived — not offered</p>}
+            {p.archived && (
+              <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-stone-500 inline-flex items-center gap-1">
+                <Archive className="h-3 w-3" /> Archived — not offered
+              </p>
+            )}
           </Card>
         ))}
       </div>
@@ -265,7 +331,10 @@ export default function PlansPage() {
       {/* Feature matrix */}
       <Card className="mt-6 overflow-hidden">
         <div className="p-5 pb-3">
-          <SectionTitle title="Features by plan" hint="Click a cell to include or remove a feature. Core pages of each module are on every plan." />
+          <SectionTitle
+            title="Features by plan"
+            hint="Click a cell to include or remove a feature. Core pages of each module are on every plan."
+          />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -273,7 +342,10 @@ export default function PlansPage() {
               <tr className="border-y border-stone-100 bg-stone-50/60">
                 <th className="text-left py-2.5 pl-5 pr-4 text-[11px] font-bold uppercase tracking-wide text-stone-400">Feature</th>
                 {draft.plans.map((p) => (
-                  <th key={p.id} className={cn('py-2.5 px-3 text-center text-xs font-bold text-stone-700 min-w-[88px]', p.archived && 'text-stone-400')}>
+                  <th
+                    key={p.id}
+                    className={cn('py-2.5 px-3 text-center text-xs font-bold text-stone-700 min-w-[88px]', p.archived && 'text-stone-400')}
+                  >
                     {p.name}
                   </th>
                 ))}
@@ -296,7 +368,10 @@ export default function PlansPage() {
                 return (
                   <React.Fragment key={v.value}>
                     <tr>
-                      <td colSpan={draft.plans.length + 1} className="pt-4 pb-1.5 pl-5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-400">
+                      <td
+                        colSpan={draft.plans.length + 1}
+                        className="pt-4 pb-1.5 pl-5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-400"
+                      >
                         <span className="inline-flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full" style={{ background: v.color }} aria-hidden />
                           {v.short}
@@ -321,7 +396,9 @@ export default function PlansPage() {
                                 onClick={() => toggleFeature(p.id, f.key)}
                                 className={cn(
                                   'h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors',
-                                  on ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'text-stone-300 hover:bg-stone-100 hover:text-stone-500'
+                                  on
+                                    ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                    : 'text-stone-300 hover:bg-stone-100 hover:text-stone-500'
                                 )}
                               >
                                 {on ? <Check className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
@@ -344,12 +421,34 @@ export default function PlansPage() {
         <SectionTitle title="Billing settings" hint="Apply to every business" />
         <div className="grid gap-4 lg:grid-cols-3">
           <Field label="Grace period (days)" hint="How long after a missed payment before the dashboard locks" htmlFor="grace">
-            <Input id="grace" type="number" min={0} max={90} value={draft.settings.graceDays} onChange={(e) => setSetting('graceDays', Math.max(0, Math.round(toNum(e.target.value))))} />
+            <Input
+              id="grace"
+              type="number"
+              min={0}
+              max={90}
+              value={draft.settings.graceDays}
+              onChange={(e) => setSetting('graceDays', Math.max(0, Math.round(toNum(e.target.value))))}
+            />
           </Field>
-          <Field label="Support contact" hint="Shown to owners, e.g. a WhatsApp number or email" htmlFor="support" className="lg:col-span-2">
-            <Input id="support" value={draft.settings.supportContact} maxLength={200} onChange={(e) => setSetting('supportContact', e.target.value)} />
+          <Field
+            label="Support contact"
+            hint="Shown to owners, e.g. a WhatsApp number or email"
+            htmlFor="support"
+            className="lg:col-span-2"
+          >
+            <Input
+              id="support"
+              value={draft.settings.supportContact}
+              maxLength={200}
+              onChange={(e) => setSetting('supportContact', e.target.value)}
+            />
           </Field>
-          <Field label="How to pay" hint="Owners see this on their billing page and when locked out" htmlFor="instructions" className="lg:col-span-3">
+          <Field
+            label="How to pay"
+            hint="Owners see this on their billing page and when locked out"
+            htmlFor="instructions"
+            className="lg:col-span-3"
+          >
             <Textarea
               id="instructions"
               rows={3}
@@ -387,7 +486,8 @@ export default function PlansPage() {
           setEditing(null)
         }}
         onRemove={() => {
-          if (editing && !plansInUse(subs.data).has(editing.plan.id)) setDraft((d) => d && { ...d, plans: d.plans.filter((x) => x.id !== editing.plan.id) })
+          if (editing && !plansInUse(subs.data).has(editing.plan.id))
+            setDraft((d) => d && { ...d, plans: d.plans.filter((x) => x.id !== editing.plan.id) })
           setEditing(null)
         }}
       />

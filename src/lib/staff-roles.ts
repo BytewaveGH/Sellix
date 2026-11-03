@@ -93,27 +93,104 @@ const defineModule = (permissions: StaffPermission[], roles: RolePreset[]): Staf
 export const STAFF_MODULES: Record<AppType, StaffModule> = {
   retail: defineModule(
     [
-      { key: 'canManageSales', label: 'Sell at the POS', description: 'POS, orders and customers', icon: ShoppingCart, color: 'bg-green-100 text-green-700' },
-      { key: 'canViewReports', label: 'See reports', description: 'Overview and analytics', icon: BarChart2, color: 'bg-blue-100 text-blue-700' },
-      { key: 'canManageProducts', label: 'Manage products', description: 'Add and edit products and prices', icon: Package, color: 'bg-purple-100 text-purple-700' },
-      { key: 'canManageStock', label: 'Manage inventory', description: 'Stock levels, adjustments and transfers', icon: Warehouse, color: 'bg-amber-100 text-amber-700' },
-      { key: 'canManageInvoices', label: 'Manage invoices', description: 'Supplier invoices for stock', icon: FileText, color: 'bg-cyan-100 text-cyan-700' },
-      { key: 'canManageWarehouses', label: 'Manage warehouses', description: 'Warehouses, categories and units', icon: Building2, color: 'bg-rose-100 text-rose-700' },
-      { key: 'canManageOperations', label: 'Store settings', description: 'Store and payment settings', icon: Settings2, color: 'bg-orange-100 text-orange-700' },
+      {
+        key: 'canManageSales',
+        label: 'Sell at the POS',
+        description: 'POS, orders and customers',
+        icon: ShoppingCart,
+        color: 'bg-green-100 text-green-700',
+      },
+      {
+        key: 'canViewReports',
+        label: 'See reports',
+        description: 'Overview and analytics',
+        icon: BarChart2,
+        color: 'bg-blue-100 text-blue-700',
+      },
+      {
+        key: 'canManageProducts',
+        label: 'Manage products',
+        description: 'Add and edit products and prices',
+        icon: Package,
+        color: 'bg-purple-100 text-purple-700',
+      },
+      {
+        key: 'canManageStock',
+        label: 'Manage inventory',
+        description: 'Stock levels, adjustments and transfers',
+        icon: Warehouse,
+        color: 'bg-amber-100 text-amber-700',
+      },
+      {
+        key: 'canManageInvoices',
+        label: 'Manage invoices',
+        description: 'Supplier invoices for stock',
+        icon: FileText,
+        color: 'bg-cyan-100 text-cyan-700',
+      },
+      {
+        key: 'canManageWarehouses',
+        label: 'Manage warehouses',
+        description: 'Warehouses, categories and units',
+        icon: Building2,
+        color: 'bg-rose-100 text-rose-700',
+      },
+      {
+        key: 'canManageOperations',
+        label: 'Store settings',
+        description: 'Store and payment settings',
+        icon: Settings2,
+        color: 'bg-orange-100 text-orange-700',
+      },
       EMPLOYEES,
     ],
     [
       { label: 'Cashier', description: 'Sales only', color: PRESET_COLORS.green, grants: ['canManageSales'] },
-      { label: 'Stock keeper', description: 'Stock and warehouses', color: PRESET_COLORS.amber, grants: ['canManageStock', 'canManageInvoices', 'canManageWarehouses'] },
+      {
+        label: 'Stock keeper',
+        description: 'Stock and warehouses',
+        color: PRESET_COLORS.amber,
+        grants: ['canManageStock', 'canManageInvoices', 'canManageWarehouses'],
+      },
     ]
   ),
   eatery: defineModule(
     [
-      { key: 'canManageSales', label: 'Take orders', description: 'Counter (POS) and live orders', icon: ShoppingCart, color: 'bg-green-100 text-green-700' },
-      { key: 'canViewReports', label: 'See sales & profit', description: 'Overview and sales history', icon: BarChart2, color: 'bg-blue-100 text-blue-700' },
-      { key: 'canManageProducts', label: 'Edit menu & brand', description: 'Menu, deals, storefront look', icon: Palette, color: 'bg-purple-100 text-purple-700' },
-      { key: 'canManageStock', label: 'Manage ingredients', description: 'Stock, purchases, waste and costs', icon: ChefHat, color: 'bg-amber-100 text-amber-700' },
-      { key: 'canManageOperations', label: 'Restaurant settings', description: 'Hours, delivery, payments, tables', icon: Settings2, color: 'bg-orange-100 text-orange-700' },
+      {
+        key: 'canManageSales',
+        label: 'Take orders',
+        description: 'Counter (POS) and live orders',
+        icon: ShoppingCart,
+        color: 'bg-green-100 text-green-700',
+      },
+      {
+        key: 'canViewReports',
+        label: 'See sales & profit',
+        description: 'Overview and sales history',
+        icon: BarChart2,
+        color: 'bg-blue-100 text-blue-700',
+      },
+      {
+        key: 'canManageProducts',
+        label: 'Edit menu & brand',
+        description: 'Menu, deals, storefront look',
+        icon: Palette,
+        color: 'bg-purple-100 text-purple-700',
+      },
+      {
+        key: 'canManageStock',
+        label: 'Manage ingredients',
+        description: 'Stock, purchases, waste and costs',
+        icon: ChefHat,
+        color: 'bg-amber-100 text-amber-700',
+      },
+      {
+        key: 'canManageOperations',
+        label: 'Restaurant settings',
+        description: 'Hours, delivery, payments, tables',
+        icon: Settings2,
+        color: 'bg-orange-100 text-orange-700',
+      },
       EMPLOYEES,
     ],
     [
@@ -123,10 +200,34 @@ export const STAFF_MODULES: Record<AppType, StaffModule> = {
   ),
   'real-estate': defineModule(
     [
-      { key: 'canManageSales', label: 'Manage tenants & rent', description: 'Tenants, leases, payments and short stays', icon: Wallet, color: 'bg-green-100 text-green-700' },
-      { key: 'canManageProducts', label: 'Manage properties', description: 'Properties, units, room types, projects, documents', icon: Building, color: 'bg-purple-100 text-purple-700' },
-      { key: 'canManageOperations', label: 'Manage repairs', description: 'Maintenance requests and costs', icon: Hammer, color: 'bg-orange-100 text-orange-700' },
-      { key: 'canViewReports', label: 'View everything', description: 'Portfolio dashboard; read-only access to rent, repairs and projects', icon: BarChart2, color: 'bg-blue-100 text-blue-700' },
+      {
+        key: 'canManageSales',
+        label: 'Manage tenants & rent',
+        description: 'Tenants, leases, payments and short stays',
+        icon: Wallet,
+        color: 'bg-green-100 text-green-700',
+      },
+      {
+        key: 'canManageProducts',
+        label: 'Manage properties',
+        description: 'Properties, units, room types, projects, documents',
+        icon: Building,
+        color: 'bg-purple-100 text-purple-700',
+      },
+      {
+        key: 'canManageOperations',
+        label: 'Manage repairs',
+        description: 'Maintenance requests and costs',
+        icon: Hammer,
+        color: 'bg-orange-100 text-orange-700',
+      },
+      {
+        key: 'canViewReports',
+        label: 'View everything',
+        description: 'Portfolio dashboard; read-only access to rent, repairs and projects',
+        icon: BarChart2,
+        color: 'bg-blue-100 text-blue-700',
+      },
       EMPLOYEES,
     ],
     [
@@ -137,9 +238,27 @@ export const STAFF_MODULES: Record<AppType, StaffModule> = {
   ),
   amusement: defineModule(
     [
-      { key: 'canManageSales', label: 'Sell tickets & bookings', description: 'Tickets, bookings and the leaderboard', icon: Ticket, color: 'bg-green-100 text-green-700' },
-      { key: 'canManageProducts', label: 'Manage attractions', description: 'Rides, games and prices', icon: Compass, color: 'bg-purple-100 text-purple-700' },
-      { key: 'canViewReports', label: 'See the overview', description: 'Park dashboard', icon: BarChart2, color: 'bg-blue-100 text-blue-700' },
+      {
+        key: 'canManageSales',
+        label: 'Sell tickets & bookings',
+        description: 'Tickets, bookings and the leaderboard',
+        icon: Ticket,
+        color: 'bg-green-100 text-green-700',
+      },
+      {
+        key: 'canManageProducts',
+        label: 'Manage attractions',
+        description: 'Rides, games and prices',
+        icon: Compass,
+        color: 'bg-purple-100 text-purple-700',
+      },
+      {
+        key: 'canViewReports',
+        label: 'See the overview',
+        description: 'Park dashboard',
+        icon: BarChart2,
+        color: 'bg-blue-100 text-blue-700',
+      },
       EMPLOYEES,
     ],
     [{ label: 'Ticket desk', description: 'Tickets and bookings', color: PRESET_COLORS.green, grants: ['canManageSales'] }]

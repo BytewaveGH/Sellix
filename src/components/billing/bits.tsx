@@ -53,7 +53,13 @@ export const PeriodBar = ({ sub, access, className }: { sub: Subscription; acces
   const span = Math.max(1, end - start)
   const done = Math.min(1, Math.max(0, (Date.now() - start) / span))
   const tone =
-    access.state === 'past_due' ? 'bg-amber-500' : access.hasAccess ? (access.state === 'trialing' ? 'bg-sky-500' : 'bg-endeavour') : 'bg-rose-500'
+    access.state === 'past_due'
+      ? 'bg-amber-500'
+      : access.hasAccess
+        ? access.state === 'trialing'
+          ? 'bg-sky-500'
+          : 'bg-endeavour'
+        : 'bg-rose-500'
   return (
     <div className={className}>
       <div
