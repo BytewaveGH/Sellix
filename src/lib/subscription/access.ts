@@ -23,7 +23,8 @@ const date = (iso: string | undefined) => {
   return d && !Number.isNaN(d.getTime()) ? d : null
 }
 
-export const periodEnd = (sub: Subscription) => date(sub.status === 'trialing' ? (sub.trialEndsAt ?? sub.currentPeriodEnd) : sub.currentPeriodEnd)
+export const periodEnd = (sub: Subscription) =>
+  date(sub.status === 'trialing' ? (sub.trialEndsAt ?? sub.currentPeriodEnd) : sub.currentPeriodEnd)
 
 export const accessFor = (
   sub: Subscription | null | undefined,
@@ -50,8 +51,7 @@ export const accessFor = (
 }
 
 // Features: with no plan (no record, or a plan that was removed) nothing is gated.
-export const canUseFeature = (access: Pick<Access, 'plan'>, feature: FeatureKey) =>
-  !access.plan || access.plan.features.includes(feature)
+export const canUseFeature = (access: Pick<Access, 'plan'>, feature: FeatureKey) => !access.plan || access.plan.features.includes(feature)
 
 export const staffLimit = (access: Pick<Access, 'plan'>): number | null => access.plan?.limits.staff ?? null
 
@@ -62,9 +62,7 @@ export const canAddStaff = (access: Pick<Access, 'plan'>, used: number) => {
 
 // The cheapest plan that includes a feature (for "Available on Growth").
 export const cheapestPlanWith = (plans: Plan[], feature: FeatureKey) =>
-  plans
-    .filter((p) => !p.archived && p.features.includes(feature))
-    .sort((a, b) => a.monthlyPrice - b.monthlyPrice)[0] ?? null
+  plans.filter((p) => !p.archived && p.features.includes(feature)).sort((a, b) => a.monthlyPrice - b.monthlyPrice)[0] ?? null
 
 // ── Money ────────────────────────────────────────────────────────────────────
 

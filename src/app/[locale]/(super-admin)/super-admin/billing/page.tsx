@@ -4,7 +4,20 @@ import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { addMonths, startOfMonth } from 'date-fns'
-import { AlertTriangle, ArrowRight, Banknote, Check, Clock, CreditCard, Inbox, Layers, Search, Sparkles, TrendingUp, Wallet } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  Banknote,
+  Check,
+  Clock,
+  CreditCard,
+  Inbox,
+  Layers,
+  Search,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BarChart, Button, Card, EmptyState, ErrorNote, LoadingGrid, PageHeader, SectionTitle, StatCard } from '@/components/kit/ui'
 import { Segmented } from '@/components/kit/form'
@@ -24,7 +37,11 @@ const PLAN_TINTS = ['#0865AC', '#0D9488', '#7C3AED', '#D97706', '#DB2777', '#4B5
 
 const matches = (r: Row, f: Filter) =>
   f === 'all' ||
-  (f === 'due' ? r.access.state === 'past_due' || r.access.state === 'expired' : f === 'active' ? r.access.state === 'active' : r.access.state === f)
+  (f === 'due'
+    ? r.access.state === 'past_due' || r.access.state === 'expired'
+    : f === 'active'
+      ? r.access.state === 'active'
+      : r.access.state === f)
 
 export default function BillingDashboard() {
   const params = useParams()
@@ -57,8 +74,13 @@ export default function BillingDashboard() {
     const q = query.trim().toLowerCase()
     const rank: Record<BillingState, number> = { past_due: 0, expired: 1, trialing: 2, active: 3, canceled: 4, none: 5 }
     return view.rows
-      .filter((r) => matches(r, filter) && (!q || `${r.tenant.name} ${r.tenant.slug} ${r.access.plan?.name ?? ''}`.toLowerCase().includes(q)))
-      .sort((a, b) => rank[a.access.state] - rank[b.access.state] || (a.access.endsAt?.getTime() ?? Infinity) - (b.access.endsAt?.getTime() ?? Infinity))
+      .filter(
+        (r) => matches(r, filter) && (!q || `${r.tenant.name} ${r.tenant.slug} ${r.access.plan?.name ?? ''}`.toLowerCase().includes(q))
+      )
+      .sort(
+        (a, b) =>
+          rank[a.access.state] - rank[b.access.state] || (a.access.endsAt?.getTime() ?? Infinity) - (b.access.endsAt?.getTime() ?? Infinity)
+      )
   }, [view, filter, query])
 
   const quick = async (key: string, fn: () => Promise<unknown>) => {
@@ -136,7 +158,11 @@ export default function BillingDashboard() {
           label="Collected this month"
           value={cedis(stats.thisMonth, { compact: true })}
           icon={Banknote}
-          hint={change === null ? `${cedis(stats.lastMonth)} last month` : `${change >= 0 ? '▲' : '▼'} ${Math.round(Math.abs(change) * 100)}% vs last month`}
+          hint={
+            change === null
+              ? `${cedis(stats.lastMonth)} last month`
+              : `${change >= 0 ? '▲' : '▼'} ${Math.round(Math.abs(change) * 100)}% vs last month`
+          }
         />
         <StatCard
           label="Paying businesses"
@@ -178,7 +204,10 @@ export default function BillingDashboard() {
               .map((m) => (
                 <div
                   key={m.plan.id}
-                  style={{ width: `${(m.count / Math.max(1, mixTotal)) * 100}%`, background: PLAN_TINTS[stats.mix.indexOf(m) % PLAN_TINTS.length] }}
+                  style={{
+                    width: `${(m.count / Math.max(1, mixTotal)) * 100}%`,
+                    background: PLAN_TINTS[stats.mix.indexOf(m) % PLAN_TINTS.length],
+                  }}
                 />
               ))}
           </div>
@@ -235,7 +264,8 @@ export default function BillingDashboard() {
                     <span className="block text-[11px] text-stone-500 truncate">
                       {kind === 'request' && req ? (
                         <>
-                          <Inbox className="inline h-3 w-3 -mt-0.5" /> Wants {req.name} ({r.sub!.request!.cycle}) · {timeAgo(r.sub!.request!.requestedAt)}
+                          <Inbox className="inline h-3 w-3 -mt-0.5" /> Wants {req.name} ({r.sub!.request!.cycle}) ·{' '}
+                          {timeAgo(r.sub!.request!.requestedAt)}
                         </>
                       ) : kind === 'trial' ? (
                         <>
@@ -254,7 +284,9 @@ export default function BillingDashboard() {
                       icon={Check}
                       loading={busy === `approve-${t.id}`}
                       onClick={() =>
-                        quick(`approve-${t.id}`, () => actions.act(t.id, { type: 'approve-request' }, `${t.name} moved to ${req?.name ?? 'the new plan'}`))
+                        quick(`approve-${t.id}`, () =>
+                          actions.act(t.id, { type: 'approve-request' }, `${t.name} moved to ${req?.name ?? 'the new plan'}`)
+                        )
                       }
                     >
                       Approve

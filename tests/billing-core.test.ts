@@ -90,10 +90,18 @@ describe('actions', () => {
   })
 
   it('pays several periods at once, monthly or yearly', () => {
-    const three = run(paid(), { type: 'record-payment', amount: 1050, method: 'bank', periods: 3, reference: 'TX-9' }, '2026-11-01T00:00:00Z')
+    const three = run(
+      paid(),
+      { type: 'record-payment', amount: 1050, method: 'bank', periods: 3, reference: 'TX-9' },
+      '2026-11-01T00:00:00Z'
+    )
     expect(three.currentPeriodEnd).toBe('2027-02-15T10:00:00.000Z')
     expect(three.payments.at(-1)).toMatchObject({ reference: 'TX-9', periodStart: '2026-11-15T10:00:00.000Z' })
-    const yearly = run(run(null, { type: 'assign', planId: 'pro', cycle: 'yearly' }, '2026-10-01T00:00:00Z'), { type: 'record-payment', amount: 7500, method: 'momo' }, '2026-10-01T00:00:00Z')
+    const yearly = run(
+      run(null, { type: 'assign', planId: 'pro', cycle: 'yearly' }, '2026-10-01T00:00:00Z'),
+      { type: 'record-payment', amount: 7500, method: 'momo' },
+      '2026-10-01T00:00:00Z'
+    )
     expect(yearly.currentPeriodEnd).toBe('2027-10-01T00:00:00.000Z')
   })
 
@@ -117,22 +125,33 @@ describe('actions', () => {
   })
 
   it('handles owner plan requests: request, approve, clear', () => {
-    const req = run(paid(), { type: 'request-plan', planId: 'pro', cycle: 'yearly', note: 'paying Friday' }, '2026-10-21T00:00:00Z', 'owner')
+    const req = run(
+      paid(),
+      { type: 'request-plan', planId: 'pro', cycle: 'yearly', note: 'paying Friday' },
+      '2026-10-21T00:00:00Z',
+      'owner'
+    )
     expect(req.request).toMatchObject({ planId: 'pro', cycle: 'yearly', note: 'paying Friday' })
     expect(req.events.at(-1)?.actor).toBe('owner')
     const approved = run(req, { type: 'approve-request' }, '2026-10-22T00:00:00Z')
     expect(approved).toMatchObject({ planId: 'pro', cycle: 'yearly', request: undefined, currentPeriodEnd: req.currentPeriodEnd })
     expect(run(req, { type: 'clear-request' }, '2026-10-22T00:00:00Z', 'owner').events.at(-1)?.summary).toBe('Request withdrawn')
-    expect(() => run(paid(), { type: 'request-plan', planId: 'growth', cycle: 'monthly' }, '2026-10-21T00:00:00Z')).toThrow(/already on Growth/)
+    expect(() => run(paid(), { type: 'request-plan', planId: 'growth', cycle: 'monthly' }, '2026-10-21T00:00:00Z')).toThrow(
+      /already on Growth/
+    )
     expect(() => run(paid(), { type: 'approve-request' }, '2026-10-21T00:00:00Z')).toThrow(/no pending request/)
   })
 
   it('refuses archived or unknown plans, but keeps a business on its archived plan', () => {
     const cat = structuredClone(catalog)
     cat.plans[1].archived = true
-    expect(() => run(null, { type: 'assign', planId: 'growth', cycle: 'monthly' }, '2026-10-01T00:00:00Z', 'platform', cat)).toThrow(/no longer offered/)
+    expect(() => run(null, { type: 'assign', planId: 'growth', cycle: 'monthly' }, '2026-10-01T00:00:00Z', 'platform', cat)).toThrow(
+      /no longer offered/
+    )
     expect(() => run(null, { type: 'assign', planId: 'nope', cycle: 'monthly' }, '2026-10-01T00:00:00Z')).toThrow(/doesn’t exist/)
-    expect(run(paid(), { type: 'change-plan', planId: 'growth', cycle: 'yearly' }, '2026-10-21T00:00:00Z', 'platform', cat).cycle).toBe('yearly')
+    expect(run(paid(), { type: 'change-plan', planId: 'growth', cycle: 'yearly' }, '2026-10-21T00:00:00Z', 'platform', cat).cycle).toBe(
+      'yearly'
+    )
   })
 
   it('rejects malformed actions with a 400', () => {
@@ -220,7 +239,10 @@ describe('file store', () => {
     await store.saveCatalog({ ...cat, plans: cat.plans.map((p) => (p.id === 'pro' ? { ...p, monthlyPrice: 800 } : p)) })
     expect((await store.catalog()).plans[2].monthlyPrice).toBe(800)
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 7, slug: 'belkis' }] }), { status: 200 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 7, slug: 'belkis' }] }), { status: 200 }))
+    )
     const mine = await store.forTenant({ tenant: 'belkis', accessToken: 't' })
     expect(mine.subscription?.tenantId).toBe(7)
     await store.actForTenant({ tenant: 'belkis', accessToken: 't' }, { type: 'request-plan', planId: 'pro', cycle: 'monthly' })

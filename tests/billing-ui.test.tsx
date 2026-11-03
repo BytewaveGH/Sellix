@@ -7,7 +7,11 @@ const auth = vi.hoisted(() => ({
 }))
 vi.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: auth.user } }), signOut: vi.fn() }))
 const nav = vi.hoisted(() => ({ pathname: '/en/stores/pos' }))
-vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname, useParams: () => ({ locale: 'en' }), useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => nav.pathname,
+  useParams: () => ({ locale: 'en' }),
+  useRouter: () => ({ push: vi.fn() }),
+}))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 const staff = vi.hoisted(() => ({ list: [{ id: 1 }, { id: 2 }, { id: 3 }] }))
 vi.mock('@/hooks/use-fetch', () => ({ useFetchData: () => ({ data: staff.list, isLoading: false, refetch: vi.fn() }) }))
@@ -20,7 +24,10 @@ import { BILLING_CHANGED_EVENT } from '@/lib/subscription/events'
 import type { Subscription } from '@/lib/subscription/types'
 
 const DAY = 86_400_000
-const catalog = { ...DEFAULT_CATALOG, settings: { ...DEFAULT_CATALOG.settings, paymentInstructions: 'MoMo 024 555 0000', supportContact: 'WhatsApp 020 000 0000' } }
+const catalog = {
+  ...DEFAULT_CATALOG,
+  settings: { ...DEFAULT_CATALOG.settings, paymentInstructions: 'MoMo 024 555 0000', supportContact: 'WhatsApp 020 000 0000' },
+}
 
 // Builds a subscription by replaying actions, each `daysAgo` before now.
 const history = (...steps: [BillingAction, number][]) =>

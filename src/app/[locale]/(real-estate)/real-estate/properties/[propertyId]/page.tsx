@@ -52,6 +52,7 @@ import { MoveInForm, MoveOutForm, PaymentForm } from '../../_components/forms/te
 import { BookingForm, MaintenanceForm } from '../../_components/forms/booking-maintenance-forms'
 import { DevelopmentSection } from '../../_components/development'
 import { DocumentList, DocumentUploadForm } from '../../_components/documents'
+import { propertyPhotos } from '../../_logics/site'
 
 type DrawerState =
   | { kind: 'edit-property' }
@@ -166,7 +167,7 @@ export default function PropertyDetailPage() {
       {/* Hero */}
       <Card className="overflow-hidden">
         <div className="relative">
-          <PropertyCover src={property.coverImageUrl} name={property.name} className="h-40 sm:h-52 w-full" />
+          <PropertyCover src={propertyPhotos(property)[0]} name={property.name} className="h-40 sm:h-52 w-full" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div className="min-w-0 text-white">

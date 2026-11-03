@@ -66,6 +66,13 @@ export const FEATURES = [
     description: 'Maintenance requests and costs per unit',
     routes: ['/real-estate/maintenance'],
   },
+  {
+    key: 'real-estate.website',
+    module: 'real-estate',
+    label: 'Public website',
+    description: 'Vacant rooms and short stays online, with photos, booking requests and the Sellix Homes listing',
+    routes: ['/real-estate/website'],
+  },
   // Amusement
   {
     key: 'amusement.bookings',

@@ -532,14 +532,14 @@ Until this ships, the Next.js server keeps billing in a JSON file (`BILLING_STOR
 
 **Only intent is stored.** "Past due" and "expired" are **derived** from dates, never stored, so nothing needs a scheduled job:
 
-| Derived state | When                                                                    | Access |
-| ------------- | ----------------------------------------------------------------------- | ------ |
-| `none`        | no subscription record (registered before billing)                     | full   |
-| `trialing`    | `status: trialing` and now < `trialEndsAt`                              | full   |
-| `active`      | `status: active` and now < `currentPeriodEnd`                           | full   |
-| `past_due`    | period over, now < end + `graceDays`, not canceling                     | full   |
-| `canceled`    | `status: canceled`, or `cancelAtPeriodEnd` and the period is over      | none   |
-| `expired`     | period over and grace used up                                           | none   |
+| Derived state | When                                                              | Access |
+| ------------- | ----------------------------------------------------------------- | ------ |
+| `none`        | no subscription record (registered before billing)                | full   |
+| `trialing`    | `status: trialing` and now < `trialEndsAt`                        | full   |
+| `active`      | `status: active` and now < `currentPeriodEnd`                     | full   |
+| `past_due`    | period over, now < end + `graceDays`, not canceling               | full   |
+| `canceled`    | `status: canceled`, or `cancelAtPeriodEnd` and the period is over | none   |
+| `expired`     | period over and grace used up                                     | none   |
 
 ### 8.2 Platform endpoints (`X-Platform-Key`, like §1/§3)
 
@@ -549,15 +549,15 @@ Until this ships, the Next.js server keeps billing in a JSON file (`BILLING_STOR
 - `GET /platform/tenants/:id/subscription` → `{ data: Subscription | null }`.
 - `POST /platform/tenants/:id/subscription/actions` takes one action and returns the updated `Subscription`.
 
-| Action                                                                                    | Effect                                                                                                                                                                                                                     |
-| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `{ type: "assign", planId, cycle, trialDays }`                                            | Start or restart. `trialDays > 0` → trialing to now + days. `0` → active with the period ending now (payment due). Keeps earlier payments and events.                                                                     |
-| `{ type: "change-plan", planId, cycle? }`                                                 | Switch plan; dates unchanged; clears any request. 409 if nothing changes.                                                                                                                                                  |
-| `{ type: "record-payment", amount, method, reference?, periods (1–24), paidAt? }`         | Paid time continues from the current end when trialing, active or past due. After a lapse or a cancellation it starts now. Adds `periods` × cycle. Sets `active`, clears trial and cancellation, appends a Payment. |
-| `{ type: "extend", days }`                                                                | Adds days to the later of the current end and now (the trial end while trialing).                                                                                                                                          |
-| `{ type: "cancel", atPeriodEnd }`                                                         | `true` → `cancelAtPeriodEnd`. `false` → `status: canceled` now. 409 if already canceled.                                                                                                                                   |
-| `{ type: "resume" }`                                                                      | Undo either kind of cancellation. 409 if there's nothing to undo.                                                                                                                                                          |
-| `{ type: "approve-request" }` / `{ type: "clear-request" }`                               | Apply or decline the owner's request. 409 if there's none.                                                                                                                                                                 |
+| Action                                                                            | Effect                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ type: "assign", planId, cycle, trialDays }`                                    | Start or restart. `trialDays > 0` → trialing to now + days. `0` → active with the period ending now (payment due). Keeps earlier payments and events.                                                               |
+| `{ type: "change-plan", planId, cycle? }`                                         | Switch plan; dates unchanged; clears any request. 409 if nothing changes.                                                                                                                                           |
+| `{ type: "record-payment", amount, method, reference?, periods (1–24), paidAt? }` | Paid time continues from the current end when trialing, active or past due. After a lapse or a cancellation it starts now. Adds `periods` × cycle. Sets `active`, clears trial and cancellation, appends a Payment. |
+| `{ type: "extend", days }`                                                        | Adds days to the later of the current end and now (the trial end while trialing).                                                                                                                                   |
+| `{ type: "cancel", atPeriodEnd }`                                                 | `true` → `cancelAtPeriodEnd`. `false` → `status: canceled` now. 409 if already canceled.                                                                                                                            |
+| `{ type: "resume" }`                                                              | Undo either kind of cancellation. 409 if there's nothing to undo.                                                                                                                                                   |
+| `{ type: "approve-request" }` / `{ type: "clear-request" }`                       | Apply or decline the owner's request. 409 if there's none.                                                                                                                                                          |
 
 Errors: 400 for a malformed action, 404 for an unknown plan or a tenant with no subscription, 409 as above. The frontend shows `error` verbatim, so write it for an operator. Archived plans can't be assigned or requested, but a business already on one can stay on it.
 
@@ -610,6 +610,7 @@ func unitCost(pu *ent.ProductUnit, p *ent.Product, units []*ent.ProductUnit) flo
 Load the product's units (`WithProductUnit(q.WithProduct(pq.WithUnits()))`, or a per-request cache by product id). Use this everywhere `unitCost` is used: overview COGS for sales **and** paid invoices, and top-products COGS for sales and invoices. The frontend uses the same rule to show "Cost per unit" on the product form and the unit's cost in the inventory list (`unitCosts` in `products/inventory/_logics/product-payload.ts`).
 
 Tests (purchasePrice 200 = one box of 20):
+
 - Box (`baseQuantity` 20) → 200.
 - Piece (`baseQuantity` 1, `flat`) → 10.
 - Pack (`baseQuantity` 5) → 50.
@@ -745,7 +746,14 @@ Store settings (business details printed on receipts, the receipt footer, the PO
   "business": { "name": "Adom Mini Mart", "phone": "0241234567", "email": "", "address": "Shop 12, Kaneshie Market", "taxId": "" },
   "receipt": { "footer": "Thank you!", "showCashier": true, "autoPrint": false },
   "pos": { "defaultWarehouseId": 3, "defaultCustomerType": "retail" },
-  "payments": { "cash": true, "momo": true, "momoNetwork": "mtn", "momoNumber": "0241234567", "momoName": "Adom Enterprise", "momoMerchantId": "" }
+  "payments": {
+    "cash": true,
+    "momo": true,
+    "momoNetwork": "mtn",
+    "momoNumber": "0241234567",
+    "momoName": "Adom Enterprise",
+    "momoMerchantId": ""
+  }
 }
 ```
 
@@ -778,6 +786,84 @@ Customers exist only as `customerName`/`customerPhone` on invoices, so one perso
 - The dashboard calls `PATCH /invoices/:id/unpay` (Inventory › Invoices, "mark as pending"). That route doesn't exist and returns 404. Either add it (set `payment_status` back to `pending` and clear `paid_at`), or tell us and we'll remove the button.
 - Paid invoices count in the stats on `CreateTime` but chart on `PaidAt`. See §9.5.
 
+## 12. Real estate: public website (additions to §6)
+
+The real-estate dashboard has a **Website** page (`/real-estate/website`). From there the owner publishes a public page listing their free rooms and short stays at `/{locale}/rentals/{tenantSlug}`, which works on the root domain or the business's own subdomain. Visitors don't sign in. Today it runs on browser storage, so the link only works on the owner's device. These endpoints make it real.
+
+The frontend code is in `src/app/[locale]/(real-estate)/real-estate/_logics/site.ts`. `publicSite()` there is the reference implementation of the public response. Please port it, along with its tests in `tests/real-estate-site.test.ts`, rather than re-deriving the rules.
+
+### 12.1 New fields on existing records
+
+- `Property.listed` (bool, default `false`): whether the property is shown on the website.
+- `Property.photos` (string[] of image URLs, cover first, at most 8).
+- `Unit.photos` (string[], at most 4).
+
+The dashboard sends these back unchanged on every property or unit update, so `PUT` must store them like any other field.
+
+### 12.2 Owner endpoints (owner or staff token + `X-Tenant-Domain`)
+
+- `GET /real-estate/site` returns the settings (shape below), or 404 if they have never been saved; the frontend uses defaults then. `PUT /real-estate/site` replaces them and returns the saved record. One record per tenant. Writing needs the same permission as editing properties (`canManageProducts`).
+
+  ```json
+  { "published": false, "name": "", "tagline": "", "about": "", "phone": "", "whatsapp": "",
+    "email": "", "accent": "#0865AC", "showPrices": true, "showAddress": false, "showSoon": true, "rentTerms": "",
+    "logoUrl": null, "coverUrl": null, "showInDirectory": true }
+  ```
+  `logoUrl` and `coverUrl` come from `POST /real-estate/images`. The logo is a 512 px square WebP.
+- `POST /real-estate/images`: multipart with a `file` field (JPEG or WebP, already resized by the browser to 500 KB or less). Returns `{ "url": "https://…" }`, which must be a public URL that anyone can load, because it appears on the public page. Reject files over 2 MB and anything that isn't an image.
+
+### 12.3 Public endpoints (no token; the business is picked by `X-Tenant-Domain`)
+
+- `GET /public/real-estate/site` returns 404 when the tenant doesn't exist, `published` is false, or the tenant's plan doesn't include the `real-estate.website` feature (§8; Growth and Pro by default). Otherwise it returns `PublicSite`:
+
+  ```json
+  { "slug": "acme", "on": "2026-11-03",
+    "site": { /* settings without `published` */ },
+    "properties": [{ "id": 1, "name": "", "type": "compound-house", "address": "", "city": "", "region": "",
+                     "description": "", "gpsAddress": "", "photos": [] }],
+    "listings": [{ "id": 4, "propertyId": 1, "name": "Room 4", "typeName": "Chamber & hall (self-contained)",
+                   "description": "", "rentalMode": "long-term", "price": 600, "bedrooms": 1, "livingRooms": 1,
+                   "facilities": { "bathroom": "private" }, "amenities": [], "maxGuests": 0, "photos": [],
+                   "availability": { "state": "now" }, "booked": [] }] }
+  ```
+
+  Rules (as in `publicSite()`):
+  - **Properties:** only `listed` ones, never `land`.
+  - **Units:** only `availability = available`.
+  - **Long-term units:**
+    - Free now if there is no lease that hasn't ended.
+    - Free from the move-out date (`terminatedOn`) if the tenant has given notice.
+    - Otherwise free from the day after `endDate`, but only if that is within 90 days and `showSoon` is on.
+    - Left out entirely if someone has an upcoming lease, or the unit is let with no end in sight.
+  - **Short stays:** `booked` lists the `[checkIn, checkOut)` ranges of `confirmed`/`checked-in` bookings for the next 365 days. `availability` says when the unit is next free.
+  - **Prices:** `price` is null when `showPrices` is off.
+  - **Addresses:** `address` and `gpsAddress` are empty when `showAddress` is off.
+  - **Privacy:** never include tenants, leases, payments, guest names or phones, unit notes, purchase details or documents.
+
+  Cache it for a minute or so; it's the page people share around.
+- `POST /public/real-estate/booking-requests`, with body `{ unitId, checkIn, checkOut, guests, name, phone, note? }`, creates a booking with these fields:
+  - `status: "inquiry"`
+  - `channel: "direct"`
+  - `nightlyRate`: the unit's rate
+  - `cleaningFee: 0`, `amountPaid: 0`
+  - `notes`: starts with "Requested on the website on {date}." followed by the guest's note.
+
+  Re-check everything on the server, as `acceptBookingRequest()` does:
+  - **404** if the site isn't published or the unit isn't a listed short stay.
+  - **422** for bad dates (in the past, `checkOut <= checkIn`, or more than 90 nights), guests above `maxGuests`, or a missing name or phone.
+  - **409** if the nights overlap a `confirmed` or `checked-in` booking.
+
+  Errors use the usual `{ status: false, error }` shape, because the page shows `error` to the visitor. Rate-limit by IP, for example 10 per hour, because the endpoint is anonymous. Notifying the owner (SMS or WhatsApp) would be a nice extra: today they see the request on the Bookings page.
+
+### 12.4 Sellix Homes directory (public, no tenant header)
+
+`/{locale}/rentals` lists the free rooms of every business whose site is published, whose plan includes the feature, and that has `showInDirectory` on. It works like Sellix Eats (§7) but for rentals.
+
+- `GET /public/real-estate/directory` returns `[{ slug, business: { name, accent, logoUrl }, listing, property }]`. `listing` and `property` have the same shapes and rules as §12.3, so `directoryEntries(publicSite(...))` in `site.ts` is the reference.
+- It reads across tenant databases, so build it from a cached, platform-level index that is refreshed when a tenant's site settings, units, leases or bookings change, rather than querying every tenant per request. A few minutes of staleness is fine.
+- Rooms link to `/{locale}/rentals/{slug}/{unitId}`, so `slug` must be the tenant slug that §12.3 accepts.
+
+
 ## Priority
 
 1. Tenant CRUD + owner-account creation (§1) — unblocks the whole "register a new business" flow for real, replaces the local JSON-file placeholder entirely.
@@ -789,7 +875,8 @@ Customers exist only as `customerName`/`customerPhone` on invoices, so one perso
 7. Store stats fixes (§9) — §9.1 (cost of goods per unit) first: until then any piece or pack sold under the flat/wholesale rule is costed as a whole box, so those products show a loss. §9.4–9.5 make daily cash/MoMo reconciliation exact.
 8. Accounts and team (§10) — §10.3's `PUT /auth/reset-password/:id` lockdown first (security). Then owner change/forgot password (§10.3), staff change password (§10.1) and suspend (§10.2).
 9. Store module (§11) — §11.1 store settings first, so every till shares the receipt and payment setup. Then the list filters (§11.2).
-10. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
-11. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
+10. Real-estate public website (§12) — §12.2 and §12.3 make the shared link work for everyone, not just on the owner's device. Photos need §12.2's image upload.
+11. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
+12. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
 
 Happy to hop on a call to go through response shapes/edge cases once you've had a look.

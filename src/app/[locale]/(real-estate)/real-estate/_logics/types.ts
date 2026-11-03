@@ -39,6 +39,10 @@ export interface Property {
   seller?: string
   // Only for type 'land'.
   land?: LandDetails
+  // Shown on the public website (site.ts). Off until the owner turns it on.
+  listed?: boolean
+  // Website gallery, cover first. Uploaded links (data URLs in local mode).
+  photos?: string[]
   createdAt?: string
 }
 
@@ -79,6 +83,8 @@ export interface Unit {
   nightlyRate: number
   maxGuests: number
   availability: UnitAvailability
+  // Website photos of this unit; the property's gallery is used when empty.
+  photos?: string[]
   notes?: string
 }
 

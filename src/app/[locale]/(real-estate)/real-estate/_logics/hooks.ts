@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useQueries, useQueryClient, type Query } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient, type Query } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useAxios } from '@/hooks/use-axios'
@@ -10,6 +10,9 @@ import { apiErrorMessage, apiStatus } from '@/lib/api-error'
 import { createApiSource, createLocalSource, DATA_SOURCE_KIND, type DataSource, type DocumentDraft } from './data-source'
 import { realEstateAccess, RESOURCE_AREA, type Area, type RealEstateAccess } from './access'
 import { classifyLoadError, isFormError, loadErrorMessage, retryDelay, shouldRetry, type LoadErrorKind } from './errors'
+import { compressFile } from '@/app/[locale]/(stores)/stores/pos/_logics/scanner/image'
+import { prepareImage } from '@/lib/eatery/images'
+import type { SiteSettings } from './site'
 import type { DocumentRecord, ResourceMap, ResourceName } from './types'
 
 const RESOURCES: ResourceName[] = [
@@ -130,6 +133,33 @@ export const usePortfolio = (): Portfolio => {
   }, [ready, access, ...results.map((r) => r.data), ...results.map((r) => r.error), ...results.map((r) => r.isFetching)])
 }
 
+// The public website's settings (one record per business).
+export const useSiteSettings = () => {
+  const { source, ready, scope } = useDataSource()
+  return useQuery({
+    queryKey: ['real-estate', source.kind, scope, 'site'],
+    queryFn: () => source.getSite(),
+    enabled: ready,
+    staleTime: 30_000,
+    retry: shouldRetry,
+    retryDelay,
+    refetchOnWindowFocus: false,
+  })
+}
+
+export type SiteImageKind = 'photo' | 'logo' | 'cover'
+
+// Website images: resized before upload so listings load fast on mobile data.
+// Local mode keeps them inside browser storage, so they're made smaller there.
+// Logos are cropped square (512 px), like the eatery's.
+export const prepareSitePhoto = async (file: Blob, kind: SiteImageKind = 'photo') => {
+  if (kind === 'logo') return prepareImage(file, 'logo')
+  const local = DATA_SOURCE_KIND === 'local'
+  const out = await compressFile(file, { maxEdge: local ? 1200 : 1600, quality: 0.75, maxBytes: (local ? 180 : 500) * 1024 })
+  if (!out) throw new Error('Couldn’t make that photo small enough — try another')
+  return out
+}
+
 // Writes. Each call refreshes all real-estate data (cascades on delete touch
 // several collections). Writes are never retried. Failures are surfaced, then
 // rethrown:
@@ -190,5 +220,15 @@ export const useRealEstateActions = (opts: { inline?: boolean } = {}) => {
       }
     },
     shareLink: (doc: DocumentRecord) => source.shareLink(doc).catch(() => null),
+    saveSite: (site: SiteSettings) => run(() => source.saveSite(site), 'Couldn’t save the website settings.'),
+    // Resolves to the photo's link; nothing is saved until the record using it is.
+    uploadImage: async (file: File, kind: SiteImageKind = 'photo') => {
+      try {
+        return await source.uploadImage(await prepareSitePhoto(file, kind))
+      } catch (err) {
+        toast.error(apiErrorMessage(err, err instanceof Error ? err.message : 'Couldn’t upload the photo.'))
+        throw err
+      }
+    },
   }
 }

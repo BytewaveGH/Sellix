@@ -81,7 +81,8 @@ export const LockedScreen = () => {
   const locale = useLocale()
   const { access, subscription, isOwner } = useBilling()
   const trialEnded = access.state === 'expired' && subscription?.status === 'trialing'
-  const title = access.state === 'canceled' ? 'Your subscription was canceled' : trialEnded ? 'Your trial has ended' : 'Your subscription has ended'
+  const title =
+    access.state === 'canceled' ? 'Your subscription was canceled' : trialEnded ? 'Your trial has ended' : 'Your subscription has ended'
   return (
     <Screen icon={Lock} tone="rose">
       <h1 className="text-xl font-extrabold tracking-tight text-stone-900">{title}</h1>
@@ -118,7 +119,9 @@ export const UpgradeScreen = ({ feature }: { feature: Feature }) => {
   const plan = cheapestPlanWith(catalog.plans, feature.key)
   return (
     <Screen icon={Sparkles} tone="blue">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-endeavour/80">{plan ? `${plan.name} feature` : 'Not on your plan'}</p>
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-endeavour/80">
+        {plan ? `${plan.name} feature` : 'Not on your plan'}
+      </p>
       <h1 className="text-xl font-extrabold tracking-tight text-stone-900 mt-1.5">{feature.label}</h1>
       <p className="text-sm text-stone-500 mt-2 max-w-sm mx-auto">{feature.description}.</p>
       <p className="text-sm text-stone-600 mt-4">
@@ -198,7 +201,11 @@ export const BillingBanner = () => {
       )}
     >
       <span className="flex items-start gap-2 flex-1">
-        {tone === 'amber' ? <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> : <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" />}
+        {tone === 'amber' ? (
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+        ) : (
+          <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" />
+        )}
         {text}
       </span>
       <span className="flex items-center gap-1 self-end sm:self-auto">

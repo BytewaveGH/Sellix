@@ -15,6 +15,8 @@ const SUPER_ADMIN_AREA_RE = /^\/(en|fr)\/super-admin(\/.*)?$/
 const AMUSEMENT_BOARD_RE = /^\/(en|fr)\/amusement\/board\/?$/
 // The customer-facing eatery site (directory, menus, checkout, order tracking).
 const EAT_RE = /^\/(en|fr)\/eat(\/.*)?$/
+// A landlord's public website (/rentals/<business>/…).
+const RENTALS_RE = /^\/(en|fr)\/rentals(\/.*)?$/
 
 // Ordered list used to find the first route an employee can access.
 // More specific paths must come before their parents (e.g. /products/inventory before /products).
@@ -35,6 +37,7 @@ const EMPLOYEE_ROUTE_PRIORITY = [
   // Real estate — same permission keys as its sidebar (src/components/generals/layouts/logics/data.tsx).
   { path: '/real-estate/properties', perm: 'canManageProducts' },
   { path: '/real-estate/room-types', perm: 'canManageProducts' },
+  { path: '/real-estate/website', perm: 'canManageProducts' },
   { path: '/real-estate/documents', perm: ['canManageProducts', 'canViewReports'] },
   { path: '/real-estate/tenants', perm: ['canManageSales', 'canViewReports'] },
   { path: '/real-estate/rent', perm: ['canManageSales', 'canViewReports'] },
@@ -76,7 +79,7 @@ export default auth((req: NextAuthRequest) => {
   // Disabled entirely (kind is never 'root') until NEXT_PUBLIC_ROOT_DOMAIN is set.
   const hostKind = classifyHost(req.headers.get('host')).kind
   if (hostKind === 'root') {
-    if (SELECT_APP_RE.test(pathname) || EAT_RE.test(pathname)) {
+    if (SELECT_APP_RE.test(pathname) || EAT_RE.test(pathname) || RENTALS_RE.test(pathname)) {
       return intlMiddleware(req as unknown as NextRequest)
     }
     if (!SUPER_ADMIN_AREA_RE.test(pathname)) {
@@ -108,6 +111,7 @@ export default auth((req: NextAuthRequest) => {
     SUPER_ADMIN_LOGIN_RE.test(pathname) ||
     AMUSEMENT_BOARD_RE.test(pathname) ||
     EAT_RE.test(pathname) ||
+    RENTALS_RE.test(pathname) ||
     pathname === '/'
 
   if (!isLoggedIn && !isAuthPage) {

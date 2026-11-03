@@ -21,6 +21,7 @@ import {
   BedDouble,
   Hammer,
   Shapes,
+  Globe,
   FileText,
   ClipboardList,
   UtensilsCrossed,
@@ -104,6 +105,7 @@ const realEstateSidebarItems = [
     items: [
       { label: 'Properties', href: '/en/real-estate/properties', icon: Building, requiredPermission: 'canManageProducts' },
       { label: 'Room types', href: '/en/real-estate/room-types', icon: Shapes, requiredPermission: 'canManageProducts' },
+      { label: 'Website', href: '/en/real-estate/website', icon: Globe, requiredPermission: 'canManageProducts' },
       { label: 'Tenants', href: '/en/real-estate/tenants', icon: Users, requiredPermission: ['canManageSales', 'canViewReports'] },
       { label: 'Rent & payments', href: '/en/real-estate/rent', icon: Wallet, requiredPermission: ['canManageSales', 'canViewReports'] },
       {

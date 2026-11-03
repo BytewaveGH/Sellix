@@ -50,7 +50,8 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-stone-900">
-              Asked for {requested.name} ({sub.request.cycle}) · {cedis(priceFor(requested, sub.request.cycle))}/{cycleLabel(sub.request.cycle)}
+              Asked for {requested.name} ({sub.request.cycle}) · {cedis(priceFor(requested, sub.request.cycle))}/
+              {cycleLabel(sub.request.cycle)}
             </p>
             <p className="text-xs text-stone-500">
               {timeAgo(sub.request.requestedAt)}
@@ -70,7 +71,9 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
               size="sm"
               icon={Check}
               loading={busy === 'approve'}
-              onClick={() => quick('approve', () => actions.act(tenant.id, { type: 'approve-request' }, `${tenant.name} moved to ${requested.name}`))}
+              onClick={() =>
+                quick('approve', () => actions.act(tenant.id, { type: 'approve-request' }, `${tenant.name} moved to ${requested.name}`))
+              }
             >
               Approve
             </Button>
@@ -118,7 +121,12 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
                   Undo cancel
                 </Button>
               ) : (
-                <Button variant="ghost" icon={XCircle} className="sm:ml-auto text-rose-600 hover:bg-rose-50" onClick={() => setDrawer('cancel')}>
+                <Button
+                  variant="ghost"
+                  icon={XCircle}
+                  className="sm:ml-auto text-rose-600 hover:bg-rose-50"
+                  onClick={() => setDrawer('cancel')}
+                >
                   Cancel…
                 </Button>
               )}
@@ -131,7 +139,9 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
             </span>
             <div className="flex-1">
               <p className="text-base font-bold text-stone-900">Not on a plan</p>
-              <p className="text-sm text-stone-500">Registered before billing, so it has full access for free. Assign a plan to start billing.</p>
+              <p className="text-sm text-stone-500">
+                Registered before billing, so it has full access for free. Assign a plan to start billing.
+              </p>
             </div>
             <Button onClick={() => setDrawer('plan')}>Assign a plan</Button>
           </div>

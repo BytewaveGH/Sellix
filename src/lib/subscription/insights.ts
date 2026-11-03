@@ -22,7 +22,10 @@ export const billingRows = <T extends { id: number }>(tenants: T[], subs: Subscr
 // grace, expected to pay). Trials and lapsed businesses don't count.
 export const mrr = (rows: BillingRow<{ id: number }>[]) =>
   rows.reduce(
-    (sum, r) => (r.sub && r.access.plan && (r.access.state === 'active' || r.access.state === 'past_due') ? sum + monthlyEquivalent(r.access.plan, r.sub.cycle) : sum),
+    (sum, r) =>
+      r.sub && r.access.plan && (r.access.state === 'active' || r.access.state === 'past_due')
+        ? sum + monthlyEquivalent(r.access.plan, r.sub.cycle)
+        : sum,
     0
   )
 

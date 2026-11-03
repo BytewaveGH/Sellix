@@ -246,6 +246,9 @@ export const PropertyForm = ({
         region: v.region || undefined,
         description: v.description || undefined,
         coverImageUrl: v.coverImageUrl || undefined,
+        // Set on the Website page; kept as they are.
+        listed: property?.listed,
+        photos: property?.photos,
         purchasePrice: v.purchasePrice ? Number(v.purchasePrice) : undefined,
         purchaseDate: v.purchaseDate || undefined,
         seller: v.seller?.trim() || undefined,
@@ -355,7 +358,7 @@ export const PropertyForm = ({
             </Field>
             <Field
               label="Photo link"
-              hint="Optional — a public image URL"
+              hint="Optional — or upload photos on the Website page"
               error={form.formState.errors.coverImageUrl?.message}
               htmlFor="p-photo"
             >
