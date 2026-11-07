@@ -149,7 +149,7 @@ export default function WebsitePage() {
               >
                 <span
                   className={cn(
-                    'absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform',
+                    'absolute top-0.5 h-6 w-6 rounded-full bg-white shadow dark:bg-[#e7e5e4] transition-transform',
                     saved.published ? 'translate-x-[22px]' : 'translate-x-0.5'
                   )}
                 />

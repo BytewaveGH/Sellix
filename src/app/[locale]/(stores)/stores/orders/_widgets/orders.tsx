@@ -146,7 +146,7 @@ export const Orders = ({ view }: { view: OrdersView }) => {
             aria-current={v.view === view ? 'page' : undefined}
             className={cn(
               'flex-1 sm:flex-none whitespace-nowrap rounded-lg px-3.5 py-1.5 text-center text-sm font-semibold transition-colors',
-              v.view === view ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-800'
+              v.view === view ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-400' : 'text-stone-500 hover:text-stone-800'
             )}
           >
             {v.label}

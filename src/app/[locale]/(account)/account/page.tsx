@@ -11,6 +11,7 @@ import { Check, ChevronRight, Gem, LogOut, Mail, Phone, Store, Users } from 'luc
 import { cn } from '@/lib/utils'
 import { Avatar, Button, Card, PageHeader, SectionTitle, Skeleton } from '@/components/kit/ui'
 import { ChangePassword } from '@/components/account/change-password'
+import { ThemeSwitch } from '@/components/theme/theme'
 import { accountKind } from '@/lib/account'
 import { matchingPreset, staffModule } from '@/lib/staff-roles'
 import { verticalMeta } from '@/lib/verticals'
@@ -131,6 +132,10 @@ export default function AccountPage() {
 
         <div className="flex flex-col gap-4">
           <ChangePassword kind={kind} />
+          <Card className="p-5">
+            <SectionTitle title="Appearance" hint="System follows your phone or computer’s light or dark setting. Saved on this device." />
+            <ThemeSwitch className="mt-3" />
+          </Card>
           {(kind === 'owner' || user.canManageEmployees) && (
             <Card className="p-5 flex flex-col gap-2">
               <SectionTitle title="Manage" />

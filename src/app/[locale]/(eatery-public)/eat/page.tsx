@@ -309,7 +309,7 @@ export default function EatDirectory() {
                     onClick={() => setWay(w.value)}
                     className={cn(
                       'h-8 rounded-full px-3 text-xs font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900',
-                      way === w.value ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600'
+                      way === w.value ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-400' : 'text-stone-600'
                     )}
                   >
                     {w.label}

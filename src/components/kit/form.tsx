@@ -186,7 +186,7 @@ export const Segmented = <T extends string | number>({
         onClick={() => onChange(o.value)}
         className={cn(
           'flex-1 h-8 rounded-lg text-xs font-semibold transition-all',
-          value === o.value ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+          value === o.value ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-400' : 'text-stone-500 hover:text-stone-700'
         )}
       >
         {o.label}
@@ -220,7 +220,7 @@ export const Toggle = ({
     <span className={cn('relative h-6 w-10 rounded-full transition-colors flex-shrink-0', checked ? 'bg-endeavour' : 'bg-stone-200')}>
       <span
         className={cn(
-          'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+          'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow dark:bg-[#e7e5e4] transition-transform',
           checked ? 'translate-x-[18px]' : 'translate-x-0.5'
         )}
       />
