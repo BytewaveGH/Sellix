@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 import tailwindcssAnimate from 'tailwindcss-animate'
 import { PluginAPI } from 'tailwindcss/types/config'
+import { themeColors } from './src/lib/theme/palette'
 
 const config: Config = {
   darkMode: ['class'],
@@ -19,12 +20,10 @@ const config: Config = {
         'mulish-extra-bold': '800',
         'mulish-black': '900',
       },
+      // Every palette colour reads a CSS variable that flips in dark mode
+      // (src/lib/theme/palette.ts) — text/borders one way, backgrounds another.
       colors: {
-        veniceBlue: '#054B81',
-        endeavour: '#0865AC',
-        cornflowerBlue: '#59B0F2',
-        burningOrange: '#FF7433',
-        doveGray: '#686868',
+        ...themeColors.text,
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -76,6 +75,9 @@ const config: Config = {
           ring: 'hsl(var(--sidebar-ring))',
         },
       },
+      backgroundColor: themeColors.background,
+      gradientColorStops: themeColors.background,
+      ringOffsetColor: { white: themeColors.background.white },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
@@ -112,6 +114,9 @@ const config: Config = {
   },
   plugins: [
     tailwindcssAnimate,
+    function ({ addBase }: PluginAPI) {
+      addBase({ ':root': themeColors.vars.light, '.dark': themeColors.vars.dark })
+    },
     function ({ addUtilities }: PluginAPI) {
       const newUtilities = {
         '.bytewave-heading': {

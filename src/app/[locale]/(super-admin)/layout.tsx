@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import ToastTemplate from '@/components/templates/toast'
 import { Avatar } from '@/components/kit/ui'
+import { ThemeSwitch } from '@/components/theme/theme'
 import { useTenants } from './super-admin/_logics/api'
 import { useBillingBook } from './super-admin/_logics/billing'
 import { attentionCount } from '@/lib/subscription/insights'
@@ -116,6 +117,7 @@ const Sidebar = ({ base, onNavigate, onRegister }: { base: string; onNavigate?: 
         </button>
       </div>
       <div className="mt-auto p-3">
+        <ThemeSwitch className="mb-2 w-full justify-between" />
         <div className="flex items-center gap-3 rounded-xl border border-stone-200 p-2.5">
           <Avatar name={email} size="sm" />
           <div className="min-w-0 flex-1">

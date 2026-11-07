@@ -54,6 +54,29 @@ export const ago = (iso: string, now: Date) => {
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 24 * 60 ? `${Math.floor(m / 60)} h ago` : new Date(iso).toLocaleDateString()
 }
 
+// How long an order has been waiting, and how worried to be about it.
+export const waitMinutes = (o: Order, now: Date) => Math.max(0, differenceInMinutes(now, new Date(o.createdAt)))
+export const WAIT_AMBER = 10
+export const WAIT_RED = 20
+export const waitTone = (minutes: number) => (minutes >= WAIT_RED ? 'red' : minutes >= WAIT_AMBER ? 'amber' : 'ok')
+
+export const WaitTimer = ({ order, now, className }: { order: Order; now: Date; className?: string }) => {
+  const m = waitMinutes(order, now)
+  const tone = waitTone(m)
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold tabular-nums',
+        tone === 'red' ? 'bg-rose-600 text-white' : tone === 'amber' ? 'bg-amber-400 text-stone-900' : 'bg-stone-100 text-stone-700',
+        className
+      )}
+      title={`Waiting ${m} min`}
+    >
+      <Clock className="h-3.5 w-3.5" /> {m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`}
+    </span>
+  )
+}
+
 export const paymentLabel = (o: Order) =>
   `${o.payment.method === 'momo' ? 'MoMo' : o.payment.method === 'cash' ? 'Cash' : o.payment.method === 'card' ? 'Card' : 'At table'} · ${o.payment.status === 'paid' ? 'paid' : o.payment.status === 'pending' ? 'to confirm' : 'unpaid'}`
 
@@ -66,6 +89,8 @@ export const OrderCard = ({
   onCancel,
   onMarkPaid,
   compact,
+  timer,
+  className,
 }: {
   order: Order
   currency: string
@@ -75,13 +100,22 @@ export const OrderCard = ({
   onCancel?: () => void
   onMarkPaid?: () => void
   compact?: boolean
+  // Live boards: a waiting-time badge that turns amber, then red.
+  timer?: boolean
+  className?: string
 }) => {
   const step = nextStep(order)
   const Icon = FULFIL_ICON[order.fulfilment.type]
   const waiting = order.status === 'placed' && differenceInMinutes(now, new Date(order.createdAt)) >= 5
+  const late = timer && waitTone(waitMinutes(order, now)) === 'red'
   return (
     <article
-      className={cn('rounded-2xl border bg-white p-4 shadow-sm', waiting ? 'border-rose-300 ring-2 ring-rose-100' : 'border-stone-200')}
+      className={cn(
+        'rounded-2xl border bg-white shadow-sm',
+        compact ? 'p-3' : 'p-4',
+        waiting || late ? 'border-rose-300 ring-2 ring-rose-100' : 'border-stone-200',
+        className
+      )}
       aria-label={`Order ${order.code}`}
     >
       <header className="flex items-start justify-between gap-2">
@@ -91,7 +125,10 @@ export const OrderCard = ({
             {order.customer.name} · {ago(order.createdAt, now)}
           </p>
         </div>
-        <Badge spec={STATUS[order.status]} />
+        <div className="flex flex-col items-end gap-1">
+          <Badge spec={STATUS[order.status]} />
+          {timer && <WaitTimer order={order} now={now} />}
+        </div>
       </header>
       <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-stone-100 px-2 py-1 text-xs font-bold text-stone-700">
         <Icon className="h-3.5 w-3.5" /> {fulfilmentLabel(order)}
@@ -120,7 +157,8 @@ export const OrderCard = ({
           </a>
         </p>
       )}
-      {!compact && order.notes && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">“{order.notes}”</p>}
+      {/* The customer's note always shows: cooks need it on compact tickets too. */}
+      {order.notes && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">“{order.notes}”</p>}
       <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
         <div>
           <p className="text-base font-extrabold tabular-nums text-stone-900">{formatMoney(order.total, currency)}</p>

@@ -35,7 +35,8 @@ export default function RootLayout({
   }
 }>) {
   return (
-    <html lang={locale}>
+    // suppressHydrationWarning: the theme script sets class="dark" before React loads.
+    <html lang={locale} suppressHydrationWarning>
       {/* Icons come from src/app: favicon.ico, icon.png (the Sellix logo) and apple-icon.png.
           Public eatery storefronts swap in the restaurant's own logo (use-brand-favicon.ts). */}
       <body className={`${mulish.variable} font-mulish`}>

@@ -34,7 +34,7 @@ const Chips = <T extends string>({
         onClick={() => onChange(o.value)}
         className={cn(
           'h-8 whitespace-nowrap rounded-full px-3 text-xs font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900',
-          value === o.value ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600'
+          value === o.value ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-400' : 'text-stone-600'
         )}
       >
         {o.label}

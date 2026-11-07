@@ -7,6 +7,7 @@ import AvatarTemplate from '@/components/templates/avatar'
 import { usePathname, useRouter } from 'next/navigation'
 import { dashboardAppType } from '@/lib/app-type'
 import { useSession } from 'next-auth/react'
+import { ThemeSwitch } from '@/components/theme/theme'
 
 interface TopNavProps {
   trigger?: any
@@ -43,6 +44,7 @@ const TopNav = ({ trigger }: TopNavProps) => {
           },
         ]
       : []),
+    { id: 7, label: 'Theme', comp: <ThemeSwitch compact /> },
     {
       id: 6,
       label: '',

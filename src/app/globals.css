@@ -4,6 +4,29 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light;
+}
+
+/* Dark theme: colours flip through the variables in src/lib/theme/palette.ts. */
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background-color: rgb(var(--page));
+}
+
+html.dark body {
+  color: rgb(var(--tc-stone-800));
+}
+
+html.dark ::-webkit-scrollbar-track,
+html.dark .scroll ::-webkit-scrollbar {
+  background: rgb(var(--page));
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgb(var(--tc-stone-300));
 }
 
 ::-webkit-scrollbar {
@@ -108,37 +131,37 @@ html {
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --background: 15 10% 7.5%;
+    --foreground: 30 9% 92%;
+    --card: 24 8.5% 11.6%;
+    --card-foreground: 30 9% 92%;
+    --popover: 24 8.5% 11.6%;
+    --popover-foreground: 30 9% 92%;
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
+    --secondary: 12 6.5% 15.1%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --muted: 12 6.5% 15.1%;
+    --muted-foreground: 24 5.4% 63.9%;
+    --accent: 12 6.5% 15.1%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 12 6.5% 17%;
+    --input: 12 6.5% 20%;
     --ring: 240 4.9% 83.9%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 20 9% 9.5%;
+    --sidebar-foreground: 30 6% 85%;
+    --sidebar-primary: 206 91% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-accent: 12 6.5% 15.1%;
+    --sidebar-accent-foreground: 30 9% 92%;
+    --sidebar-border: 12 6.5% 15.1%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }

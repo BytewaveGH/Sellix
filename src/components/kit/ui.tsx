@@ -147,7 +147,7 @@ export const Ring = ({
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F5F5F4" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" className="stroke-stone-100" strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}

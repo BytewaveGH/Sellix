@@ -72,7 +72,7 @@ const TrendChart = ({ p, fmt }: { p: Patterns; fmt: (n: number) => string }) => 
       <svg width={w} height={H} role="img" aria-label={`Daily ${p.metric} with 7-day average`} className="block">
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={w - pad.r} y1={y(nice * t)} y2={y(nice * t)} stroke="#e7e5e4" strokeDasharray={t ? '3 4' : undefined} />
+            <line x1={pad.l} x2={w - pad.r} y1={y(nice * t)} y2={y(nice * t)} className="stroke-stone-200" strokeDasharray={t ? '3 4' : undefined} />
             <text x={pad.l - 8} y={y(nice * t) + 4} textAnchor="end" className="fill-stone-400 text-[10px] tabular-nums">
               {fmt(nice * t)}
             </text>
@@ -106,9 +106,9 @@ const TrendChart = ({ p, fmt }: { p: Patterns; fmt: (n: number) => string }) => 
         })}
         {h && (
           <g>
-            <line x1={x(hover!)} x2={x(hover!)} y1={pad.t} y2={H - pad.b} stroke="#a8a29e" strokeDasharray="2 3" />
-            <circle cx={x(hover!)} cy={y(h.value)} r={4} fill={DAILY} stroke="#fff" strokeWidth={2} />
-            <circle cx={x(hover!)} cy={y(h.avg7)} r={4} fill={AVERAGE} stroke="#fff" strokeWidth={2} />
+            <line x1={x(hover!)} x2={x(hover!)} y1={pad.t} y2={H - pad.b} className="stroke-stone-400" strokeDasharray="2 3" />
+            <circle cx={x(hover!)} cy={y(h.value)} r={4} fill={DAILY} style={{ stroke: 'rgb(var(--bc-white))' }} strokeWidth={2} />
+            <circle cx={x(hover!)} cy={y(h.avg7)} r={4} fill={AVERAGE} style={{ stroke: 'rgb(var(--bc-white))' }} strokeWidth={2} />
           </g>
         )}
         {/* Hit areas wider than the marks */}
