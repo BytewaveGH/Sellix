@@ -19,6 +19,7 @@ import { money } from '@/lib/store/orders'
 import { ProductServices } from './inventory/_logics/services'
 import { unitCosts } from './inventory/_logics/product-payload'
 import CreateProduct from './inventory/_widgets/_forms/create-product'
+import { ExportMenu, ImportProducts } from './_components/import-export'
 
 type Sort = 'name' | 'stock-low' | 'price-high'
 
@@ -85,6 +86,8 @@ export default function ProductsPage() {
             >
               Inventory
             </Link>
+            <ExportMenu products={products} />
+            <ImportProducts products={products} onDone={() => void refetch()} />
             <Button icon={Plus} onClick={() => setEditing({ open: true, product: null })}>
               Add product
             </Button>

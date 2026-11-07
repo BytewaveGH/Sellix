@@ -26,13 +26,16 @@ const useLocale = () => (useParams()?.locale as string) || 'en'
 export const SubscriptionGate = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname()
   const billing = useBilling()
-  if (!billing.settled || BILLING_RE.test(pathname ?? '')) return <>{children}</>
-  if (!billing.access.hasAccess) return <LockedScreen />
+  const pending = !billing.settled || BILLING_RE.test(pathname ?? '')
+  if (!pending && !billing.access.hasAccess) return <LockedScreen />
   const feature = featureForPath(pathname)
-  if (feature && !canUseFeature(billing.access, feature.key)) return <UpgradeScreen feature={feature} />
+  if (!pending && feature && !canUseFeature(billing.access, feature.key)) return <UpgradeScreen feature={feature} />
+  // The page keeps the same place in the tree whether or not the banner shows:
+  // when it moved, React rebuilt the page as billing loaded, closing any form
+  // or drawer opened in the first second.
   return (
     <>
-      <BillingBanner />
+      {!pending && <BillingBanner />}
       {children}
     </>
   )
