@@ -6,10 +6,14 @@
 
 import type { AxiosRequestConfig } from 'axios'
 import { apiErrorMessage, apiStatus } from '@/lib/api-error'
+import { isUnreachableError } from '@/lib/network'
 import { SalesServices } from './services'
 import type { CartItem, CustomerType } from './types'
 
 export type SalePayload = {
+  // Made by the till, kept when the same sale is sent again, so the server can
+  // ignore a repeat instead of recording it twice (BACKEND_REQUIREMENTS §13.1).
+  clientId?: string
   paymentType: 'cash' | 'momo'
   warehouseId: number
   employeeId?: number
@@ -28,8 +32,9 @@ export const saleAttribution = (user: SaleSessionUser): { employeeId?: number } 
 
 export const buildSalePayload = (
   cart: CartItem[],
-  opts: { paymentType: 'cash' | 'momo'; warehouseId: number; customerType: CustomerType; user: SaleSessionUser }
+  opts: { paymentType: 'cash' | 'momo'; warehouseId: number; customerType: CustomerType; user: SaleSessionUser; clientId?: string }
 ): SalePayload => ({
+  ...(opts.clientId ? { clientId: opts.clientId } : {}),
   paymentType: opts.paymentType,
   warehouseId: opts.warehouseId,
   ...saleAttribution(opts.user),
@@ -58,7 +63,9 @@ export type CheckoutFailure =
   | { ok: false; kind: 'stock'; message: string; productId?: string }
   // 422 — the cart itself is invalid; fix, don't retry.
   | { ok: false; kind: 'invalid'; message: string }
-  | { ok: false; kind: 'network' | 'other'; message: string }
+  // No answer (connection dropped, timed out): the sale may or may not be recorded.
+  | { ok: false; kind: 'unconfirmed'; message: string }
+  | { ok: false; kind: 'other'; message: string }
 
 export type CheckoutResult = { ok: true; receipt: SaleReceipt } | CheckoutFailure
 
@@ -85,7 +92,8 @@ const toReceipt = (sale: any): SaleReceipt => ({
 
 export const classifyCheckoutError = (err: any): CheckoutFailure => {
   const status = apiStatus(err)
-  if (!status) return { ok: false, kind: 'network', message: 'Could not reach the server. The sale was not recorded.' }
+  if (!status || isUnreachableError(err))
+    return { ok: false, kind: 'unconfirmed', message: 'The connection dropped before Sellix confirmed this sale.' }
   const message = apiErrorMessage(err, 'The sale could not be completed.')
   if (status === 409) {
     const parsed = parseInsufficientStock(message)
@@ -95,11 +103,69 @@ export const classifyCheckoutError = (err: any): CheckoutFailure => {
   return { ok: false, kind: 'other', message }
 }
 
+// Long enough for a slow connection; short enough that a cashier isn't left
+// staring at "Processing…" when the connection has gone.
+export const SALE_TIMEOUT_MS = 20_000
+
 export const submitSale = async (request: (config: AxiosRequestConfig) => Promise<any>, payload: SalePayload): Promise<CheckoutResult> => {
   try {
-    const res = await request(SalesServices.Create(payload))
-    return { ok: true, receipt: toReceipt(res?.data?.data ?? res?.data) }
+    const res = await request({ ...(SalesServices.Create(payload) as AxiosRequestConfig), timeout: SALE_TIMEOUT_MS })
+    const sale = res?.data?.data ?? res?.data
+    // The server sent our id back: it knows to ignore repeats, so a retry is safe.
+    if (payload.clientId && sale?.clientId === payload.clientId) rememberRetriesSafe()
+    return { ok: true, receipt: toReceipt(sale) }
   } catch (err) {
     return classifyCheckoutError(err)
   }
 }
+
+// ── Sending the same sale again ──────────────────────────────────────────────
+// After an unconfirmed attempt, charging the same cart again reuses its
+// clientId: once the backend supports it (§13.1) the repeat is ignored rather
+// than recorded twice. A changed cart is a new sale with a new id.
+
+export type PendingSale = { clientId: string; signature: string }
+
+export const newClientId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+      })
+
+// What makes two attempts "the same sale": payment, warehouse and items.
+export const saleSignature = (p: Omit<SalePayload, 'clientId'>) =>
+  JSON.stringify([
+    p.paymentType,
+    p.warehouseId,
+    [...p.items].map((i) => [i.productUnitId, i.quantity, i.pricingType]).sort((a, b) => Number(a[0]) - Number(b[0])),
+  ])
+
+export const clientIdFor = (pending: PendingSale | null, signature: string) =>
+  pending && pending.signature === signature ? pending.clientId : newClientId()
+
+const RETRIES_SAFE_KEY = 'sellix-pos:retries-safe'
+
+// Learnt from the server: true once it has echoed a clientId back.
+export const retriesAreSafe = () => {
+  try {
+    return localStorage.getItem(RETRIES_SAFE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const rememberRetriesSafe = () => {
+  try {
+    localStorage.setItem(RETRIES_SAFE_KEY, '1')
+  } catch {
+    // Not remembered: the cautious message shows instead.
+  }
+}
+
+// What to tell the cashier after an unconfirmed sale.
+export const unconfirmedMessage = (safe: boolean) =>
+  safe
+    ? 'The connection dropped before Sellix confirmed this sale. Charge again to retry — it won’t be recorded twice.'
+    : 'The connection dropped before Sellix confirmed this sale, so it may already be recorded. Check All orders before charging again.'

@@ -8,6 +8,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { dashboardAppType } from '@/lib/app-type'
 import { useSession } from 'next-auth/react'
 import { ThemeSwitch } from '@/components/theme/theme'
+import { ConnectionBadge } from '@/components/connection/connection-badge'
 
 interface TopNavProps {
   trigger?: any
@@ -44,6 +45,7 @@ const TopNav = ({ trigger }: TopNavProps) => {
           },
         ]
       : []),
+    { id: 8, label: 'Connection', comp: <ConnectionBadge /> },
     { id: 7, label: 'Theme', comp: <ThemeSwitch compact /> },
     {
       id: 6,

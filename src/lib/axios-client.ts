@@ -3,10 +3,13 @@ import axios, { AxiosRequestConfig } from 'axios'
 import { getSession } from 'next-auth/react'
 import { apiErrorMessage, isSessionRebindError } from './api-error'
 import { forceLogout } from './force-logout'
+import { reportReachable, reportUnreachable } from './connection'
+import { isUnreachableError } from './network'
 import { BILLING_CHANGED_EVENT } from './subscription/events'
 
 let isRefreshing = false
-let refreshQueue: Array<(token: string) => void> = []
+// Requests waiting for the refresh in progress. Each is resumed or failed with it.
+let refreshQueue: Array<{ resume: (token: string) => void; fail: (err: unknown) => void }> = []
 
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -17,6 +20,7 @@ export const apiClient = axios.create({
 const isRealEstateUrl = (url?: string) => /(^|\/)real-estate\//.test(url ?? '')
 
 apiClient.interceptors.request.use(async (config) => {
+  ;(config as { _startedAt?: number })._startedAt = Date.now()
   const session = await getSession()
   if (session?.user?.accessToken) {
     // A retry after a refresh already carries the new token; the session may still hold the old one.
@@ -27,9 +31,24 @@ apiClient.interceptors.request.use(async (config) => {
   return config
 })
 
+const elapsed = (config: unknown) => {
+  const started = (config as { _startedAt?: number } | undefined)?._startedAt
+  return started ? Date.now() - started : undefined
+}
+
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    reportReachable(elapsed(response.config))
+    return response
+  },
   async (error) => {
+    // No answer at all (offline, timeout, gateway down): never a reason to log out.
+    if (isUnreachableError(error)) {
+      reportUnreachable()
+      return Promise.reject(error)
+    }
+    if (error.response) reportReachable(elapsed(error.config))
+
     // Old (pre tenant-binding) token or tenant mismatch — refreshing can't help.
     if (isSessionRebindError(error) && !(isRealEstateUrl(error.config?.url) && /tenant mismatch/i.test(apiErrorMessage(error, '')))) {
       void forceLogout('rebind')
@@ -56,10 +75,13 @@ apiClient.interceptors.response.use(
     original._retry = true
 
     if (isRefreshing) {
-      return new Promise((resolve) => {
-        refreshQueue.push((newToken: string) => {
-          if (original.headers) original.headers['Authorization'] = `Bearer ${newToken}`
-          resolve(apiClient(original))
+      return new Promise((resolve, reject) => {
+        refreshQueue.push({
+          resume: (newToken: string) => {
+            if (original.headers) original.headers['Authorization'] = `Bearer ${newToken}`
+            resolve(apiClient(original))
+          },
+          fail: reject,
         })
       })
     }
@@ -81,15 +103,24 @@ apiClient.interceptors.response.use(
       )
       const newToken: string = data.data.accessToken
 
-      refreshQueue.forEach((cb) => cb(newToken))
+      refreshQueue.forEach((q) => q.resume(newToken))
       refreshQueue = []
 
       if (original.headers) original.headers['Authorization'] = `Bearer ${newToken}`
       return apiClient(original)
-    } catch {
+    } catch (refreshError) {
+      const waiting = refreshQueue
       refreshQueue = []
+      // The refresh couldn't reach the server: the session may be fine, so keep
+      // it. This request (and those waiting) fail like any request while offline.
+      if (isUnreachableError(refreshError)) {
+        reportUnreachable()
+        waiting.forEach((q) => q.fail(refreshError))
+        return Promise.reject(refreshError)
+      }
       // No refresh token (employees) or refresh rejected (e.g. suspended
       // employee): the session is dead, so log out instead of failing silently.
+      waiting.forEach((q) => q.fail(error))
       void forceLogout('expired')
       return Promise.reject(error)
     } finally {
