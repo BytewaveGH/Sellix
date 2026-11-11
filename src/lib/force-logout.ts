@@ -1,6 +1,7 @@
 'use client'
 
 import { getSession, signOut } from 'next-auth/react'
+import { forgetSession } from './session-offline'
 
 export type LogoutReason = 'rebind' | 'expired'
 
@@ -26,5 +27,6 @@ export const forceLogout = async (reason: LogoutReason) => {
   const locale = window.location.pathname.split('/')[1] === 'fr' ? 'fr' : 'en'
   const session = await getSession().catch(() => null)
   const staff = session?.user?.accountType === 'employee'
+  forgetSession()
   await signOut({ callbackUrl: `/${locale}${staff ? '/staff' : ''}?reason=${reason}` })
 }

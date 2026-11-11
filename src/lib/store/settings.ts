@@ -20,6 +20,8 @@ export interface StoreSettings {
     address: string
     // e.g. "TIN C0012345678"
     taxId: string
+    // Printed at the top of receipts (a small data URL or a link).
+    logoUrl?: string
   }
   receipt: {
     footer: string

@@ -15,7 +15,17 @@ import ToastTemplate from '@/components/templates/toast'
 import { toast } from 'sonner'
 import { type CartItem, type Product, type SellingUnit, mapApiProduct, piecesHint } from '../_logics/types'
 import { addLine, changeQty, normalizeStoredCart, removeLine, sanitizeQty, setQty, stockIssues } from '../_logics/cart'
-import { buildSalePayload, submitSale, type SaleReceipt } from '../_logics/checkout'
+import {
+  buildSalePayload,
+  clientIdFor,
+  retriesAreSafe,
+  saleSignature,
+  submitSale,
+  unconfirmedMessage,
+  type PendingSale,
+  type SaleReceipt,
+} from '../_logics/checkout'
+import { useConnection } from '@/lib/connection'
 import { looksLikeBarcode, scoreProduct } from '../_logics/scanner/text-match'
 import { primeFeedback } from '../_logics/scanner/feedback'
 import { RECOGNITION_CONFIG } from '../_logics/scanner/config'
@@ -303,6 +313,10 @@ const Main = () => {
   const [openPopover, setOpenPopover] = useState<string | null>(null)
   const [warehouseId, setWarehouseId] = useState<number>(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // The last sale that got no answer: charging the same cart again reuses its id.
+  const pendingSale = useRef<PendingSale | null>(null)
+  const { status: connection } = useConnection()
+  const offline = connection === 'offline'
   const [cartSheetOpen, setCartSheetOpen] = useState(false)
   const [unitPickerProduct, setUnitPickerProduct] = useState<Product | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -476,15 +490,25 @@ const Main = () => {
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
   const hasOverStock = Object.keys(overStock).length > 0
   // Stock warnings are advisory — the server re-checks atomically and answers 409.
-  const canCharge = cart.length > 0 && !!warehouseId && !isSubmitting
+  // Offline, a sale can't be recorded yet (offline selling is the next step):
+  // block it and keep the cart, rather than fail after a long wait.
+  const canCharge = cart.length > 0 && !!warehouseId && !isSubmitting && !offline
 
   const handleCharge = async (paymentType: 'momo' | 'cash') => {
     if (!canCharge) return
     setIsSubmitting(true)
     setCheckoutError(null)
     // No prices are sent: the server prices the sale from the database.
-    const result = await submitSale(request, buildSalePayload(cart, { paymentType, warehouseId, customerType, user: session?.user }))
+    const base = buildSalePayload(cart, { paymentType, warehouseId, customerType, user: session?.user })
+    const signature = saleSignature(base)
+    const clientId = clientIdFor(pendingSale.current, signature)
+    const result = await submitSale(request, { ...base, clientId })
     setIsSubmitting(false)
+    pendingSale.current = !result.ok && result.kind === 'unconfirmed' ? { clientId, signature } : null
+    if (!result.ok && result.kind === 'unconfirmed') {
+      setCheckoutError({ message: unconfirmedMessage(retriesAreSafe()) })
+      return
+    }
     if (result.ok) {
       clearCart()
       setCartSheetOpen(false)
@@ -640,6 +664,17 @@ const Main = () => {
       </div>
 
       <div className="border-t border-gray-100 px-4 py-4 flex flex-col gap-2 flex-shrink-0">
+        {offline && (
+          <div role="status" className="flex items-start gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 mb-1">
+            <span className="text-rose-500 text-xs">⚠</span>
+            <p className="text-xs text-rose-700">
+              <span className="font-bold">You’re offline.</span> Sales can’t be recorded until the connection is back — the cart is kept.
+            </p>
+          </div>
+        )}
+        {connection === 'slow' && !offline && (
+          <p className="text-[11px] text-amber-700 mb-1">Slow connection — charging may take a few seconds.</p>
+        )}
         {checkoutError && (
           <div role="alert" className="flex items-start gap-1.5 px-3 py-2 rounded-xl bg-red-50 border border-red-200 mb-1">
             <span className="text-red-500 text-xs">⚠</span>

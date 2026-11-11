@@ -4,6 +4,7 @@ import type { ExtendedUser } from './types/next-auth'
 import { SignInFormSchema } from './types/schemas/schema'
 import { IAuth } from './types/interfaces'
 import { classifyHost } from './lib/tenant'
+import { refreshOutcome } from './lib/network'
 import { lookupTenantAppType, normalizeAppType } from './lib/app-type'
 import { LOGIN_CODES, encodeBusinessChoice, type OwnerBusiness } from './lib/owner-login'
 import * as z from 'zod'
@@ -99,6 +100,9 @@ const toAbsoluteExpiry = (v: number | undefined | null): number => {
   return n < 86400 ? Math.floor(Date.now() / 1000) + n : n
 }
 
+// Only a real refusal ends the session. When the API can't be reached (down,
+// slow, a gateway error) the token is kept as it is and the refresh is tried
+// again on the next session check — poor internet must not log anyone out.
 async function refreshAccessToken(tokenObject: any) {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
@@ -108,8 +112,11 @@ async function refreshAccessToken(tokenObject: any) {
         'X-Refresh-Token': tokenObject.refreshToken as string,
         'X-Tenant-Domain': (tokenObject?.tenant as string) || 'admin',
       },
+      signal: AbortSignal.timeout(10_000),
     })
-    if (!response.ok) return { ...tokenObject, error: 'RefreshAccessTokenError' }
+    const outcome = refreshOutcome(response.status)
+    if (outcome === 'unreachable') return tokenObject
+    if (outcome === 'rejected') return { ...tokenObject, error: 'RefreshAccessTokenError' }
     const data: IAuth.Response = await response.json()
     return {
       ...tokenObject, // preserves permission fields for employees
@@ -129,7 +136,8 @@ async function refreshAccessToken(tokenObject: any) {
       error: undefined,
     }
   } catch {
-    return { ...tokenObject, error: 'RefreshAccessTokenError' }
+    // No answer (offline, timeout) or an unreadable one: try again later.
+    return tokenObject
   }
 }
 

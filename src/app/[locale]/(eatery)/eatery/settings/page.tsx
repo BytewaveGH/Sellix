@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Plus, Save, Trash2, X } from 'lucide-react'
+import { Plus, Printer, Save, Trash2, X } from 'lucide-react'
 import { Button, Card, PageHeader, SectionTitle } from '@/components/kit/ui'
 import { ConfirmDialog, Field, FormGrid, Input, Select, Textarea, Toggle, toNum } from '@/components/kit/form'
 import { ErrorNote } from '@/components/kit/ui'
@@ -13,6 +13,8 @@ import { isSlug } from '@/lib/eatery/setup'
 import type { MenuKind, MomoNetwork, Restaurant } from '@/lib/eatery/types'
 import { EateryFrame, RestaurantSwitcher } from '../_components/frame'
 import { TableQrCodes } from '../_components/table-qr'
+import { printReceipt, receiptPreviewHtml, sampleOrder } from '../_components/receipt'
+import { PrinterChoice, ReceiptPreview, usePaperWidth } from '@/components/print/receipt-setup'
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]
 
@@ -406,6 +408,8 @@ const Settings = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
           </Card>
         )}
 
+        <ReceiptsCard restaurant={d} />
+
         <Card className="p-5 lg:col-span-2 border-rose-200">
           <SectionTitle title="Delete restaurant" />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -433,4 +437,26 @@ const Settings = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
 
 export default function SettingsPage() {
   return <EateryFrame>{(o) => <Settings o={o} />}</EateryFrame>
+}
+
+// Printer width for this device, and the receipt as it will print.
+const ReceiptsCard = ({ restaurant }: { restaurant: Restaurant }) => {
+  const [paper, setPaper] = usePaperWidth()
+  return (
+    <Card className="p-5 lg:col-span-2">
+      <SectionTitle
+        title="Receipts"
+        hint="Uses your logo (Brand & theme), name, address and phone."
+        action={
+          <Button variant="secondary" size="sm" icon={Printer} onClick={() => void printReceipt(sampleOrder(restaurant), restaurant)}>
+            Print a test
+          </Button>
+        }
+      />
+      <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
+        <PrinterChoice paper={paper} onChange={setPaper} />
+        <ReceiptPreview html={receiptPreviewHtml(restaurant, paper)} paper={paper} />
+      </div>
+    </Card>
+  )
 }

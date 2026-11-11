@@ -9,7 +9,10 @@ import { useFetchData } from '@/hooks/use-fetch'
 import { IGeneric } from '@/types/interfaces'
 import { Button, Card, PageHeader, SectionTitle } from '@/components/kit/ui'
 import { Field, FormGrid, Input, Segmented, Select, Textarea, Toggle } from '@/components/kit/form'
-import { printOrder } from '@/lib/store/receipt'
+import { printOrder, receiptHtml } from '@/lib/store/receipt'
+import { blobToDataUrl, prepareImage } from '@/lib/eatery/images'
+import { ImageField } from '@/app/[locale]/(eatery)/eatery/_components/image-field'
+import { PrinterChoice, ReceiptPreview, usePaperWidth } from '@/components/print/receipt-setup'
 import type { Order } from '@/lib/store/orders'
 import { WarehouseServices } from '../products/categories/_logics/services'
 import { DeviceNote, SaveBar, useSettingsDraft } from './_widgets/draft'
@@ -34,6 +37,7 @@ const SAMPLE: Order = {
 
 export default function StoreSettingsPage() {
   const { draft, update, problems, dirty, saved, submit } = useSettingsDraft()
+  const [paper, setPaper] = usePaperWidth()
   const { data: warehousesRaw } = useFetchData('warehouses', WarehouseServices.FetchAll() as unknown as IGeneric)
   const warehouses = ((warehousesRaw as any[]) ?? []).map((w) => ({ value: String(w.id), label: w.name }))
 
@@ -80,6 +84,18 @@ export default function StoreSettingsPage() {
             </Field>
           </FormGrid>
           <div className="mt-4">
+            <ImageField
+              kind="logo"
+              label="Logo on receipts"
+              hint="Optional · a simple, high-contrast logo prints best"
+              value={draft.business.logoUrl}
+              onChange={(logoUrl) => update('business', { logoUrl })}
+              // Kept with these settings on this device, so it's made small.
+              upload={async (file) => blobToDataUrl(await prepareImage(file, 'logo'))}
+              fallback={<span className="flex h-full w-full items-center justify-center text-xs text-stone-400">None</span>}
+            />
+          </div>
+          <div className="mt-4">
             <Field label="Address" htmlFor="st-address" hint="Where customers find you, e.g. Shop 12, Kaneshie Market, Accra">
               <Textarea
                 id="st-address"
@@ -122,6 +138,11 @@ export default function StoreSettingsPage() {
               label="Print the receipt after every sale"
               hint="Otherwise the POS shows a Print button on the receipt"
             />
+            <PrinterChoice paper={paper} onChange={setPaper} />
+            <div>
+              <p className="mb-2 text-[13px] font-semibold text-stone-700">Preview</p>
+              <ReceiptPreview html={receiptHtml(SAMPLE, draft, paper)} paper={paper} />
+            </div>
           </div>
         </Card>
 
