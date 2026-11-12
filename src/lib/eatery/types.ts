@@ -217,6 +217,14 @@ export interface Order {
   costOfGoods?: number
   // Counter cash: what the customer handed over.
   tendered?: number
+  // A counter order rung up offline (§13, eatery): the number the till printed,
+  // when it was sold, and flags for the owner to review.
+  clientId?: string | null
+  receiptNo?: string | null
+  soldAt?: string
+  syncedAt?: string
+  stockShort?: boolean
+  priceMismatch?: boolean
 }
 
 export type OrderChannel = 'online' | 'counter'

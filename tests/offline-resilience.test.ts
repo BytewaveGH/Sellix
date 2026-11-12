@@ -123,6 +123,48 @@ describe('token refresh on a bad connection', () => {
   })
 })
 
+describe('cashier token refresh', () => {
+  // The app's server refreshes cashier tokens (they rotate) and keeps them.
+  const setup = async (refresh: () => Promise<unknown>) => {
+    vi.resetModules()
+    const forceLogout = vi.fn()
+    const refreshOnServer = vi.fn(refresh)
+    vi.doMock('@/lib/force-logout', () => ({ forceLogout }))
+    vi.doMock('@/lib/session-refresh', () => ({ refreshOnServer }))
+    const { apiClient } = await import('@/lib/axios-client')
+    getSession.mockResolvedValue({ user: { accountType: 'employee', accessToken: 'old', refreshToken: 'r1', tenant: 'acme' } })
+    const auth: string[] = []
+    apiClient.defaults.adapter = async (config) => {
+      auth.push(String(config.headers?.Authorization))
+      if (auth.length === 1) throw Object.assign(new Error('401'), { isAxiosError: true, config, response: { status: 401, data: {} } })
+      return { data: { ok: true }, status: 200, statusText: 'OK', headers: {}, config }
+    }
+    return { apiClient, forceLogout, refreshOnServer, auth }
+  }
+
+  it('retries with the token the server got', async () => {
+    const { apiClient, forceLogout, refreshOnServer, auth } = await setup(async () => ({ user: { accessToken: 'new' } }))
+    await expect(apiClient.get('/products')).resolves.toMatchObject({ data: { ok: true } })
+    expect(refreshOnServer).toHaveBeenCalledTimes(1)
+    expect(auth).toEqual(['Bearer old', 'Bearer new'])
+    expect(forceLogout).not.toHaveBeenCalled()
+  })
+
+  it('stays signed in when the refresh couldn’t happen', async () => {
+    for (const refresh of [async () => ({ user: { accessToken: 'old' } }), async () => Promise.reject(new TypeError('Failed to fetch'))]) {
+      const { apiClient, forceLogout } = await setup(refresh)
+      await expect(apiClient.get('/products')).rejects.toBeTruthy()
+      expect(forceLogout).not.toHaveBeenCalled()
+    }
+  })
+
+  it('signs out when the server refused it (401 or 403)', async () => {
+    const { apiClient, forceLogout } = await setup(async () => ({ user: { accessToken: 'old' }, error: 'RefreshAccessTokenError' }))
+    await expect(apiClient.get('/products')).rejects.toBeTruthy()
+    expect(forceLogout).toHaveBeenCalledWith('expired')
+  })
+})
+
 describe('connection status', () => {
   it('turns slow on slow answers and back to online on quick ones', () => {
     reportReachable(6000)

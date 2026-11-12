@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Banknote, CheckCircle2, Clock, FileText, Plus, Printer, Receipt, Search, ShoppingBag, Smartphone } from 'lucide-react'
+import { AlertTriangle, Banknote, CheckCircle2, Clock, FileText, Plus, Printer, Receipt, Search, ShoppingBag, Smartphone, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFetchData } from '@/hooks/use-fetch'
 import { useAxios } from '@/hooks/use-axios'
@@ -24,6 +24,7 @@ import {
   orderTotals,
   type Order,
   type OrderFilters,
+  type OrderReview,
   type OrdersView,
 } from '@/lib/store/orders'
 import { printOrder } from '@/lib/store/receipt'
@@ -86,6 +87,22 @@ const Stat = ({ label, value, hint, tone }: { label: string; value: string; hint
   </Card>
 )
 
+// Flags on a sale made offline that the owner should look at.
+const ReviewFlags = ({ o }: { o: Order }) => (
+  <>
+    {o.stockShort && (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+        <AlertTriangle className="h-3 w-3" /> Stock short
+      </span>
+    )}
+    {o.priceMismatch && (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+        <Tag className="h-3 w-3" /> Till price
+      </span>
+    )}
+  </>
+)
+
 export const Orders = ({ view }: { view: OrdersView }) => {
   const locale = (useParams()?.locale as string) || 'en'
   const request = useAxios()
@@ -96,14 +113,24 @@ export const Orders = ({ view }: { view: OrdersView }) => {
   const [paying, setPaying] = useState<Order | null>(null)
   const [newInvoice, setNewInvoice] = useState(false)
 
+  // Sales to look at again: the server's own filter, so older ones are found too.
+  const [review, setReview] = useState<OrderReview>('none')
   const sales = useFetchData('store-orders-sales', SalesServices.FetchAll({ limit: SALES_LIMIT, offset: 0 }) as unknown as IGeneric)
+  const reviewSales = useFetchData(
+    `store-orders-sales-${review}`,
+    SalesServices.FetchAll({ limit: SALES_LIMIT, offset: 0, [review]: true }) as unknown as IGeneric,
+    review !== 'none'
+  )
   const invoices = useFetchData(
     'store-orders-invoices',
     InvoiceServices.FetchAll({ limit: INVOICE_LIMIT, offset: 0 }) as unknown as IGeneric
   )
-  const loading = (sales.isLoading && !sales.data) || (invoices.isLoading && !invoices.data)
-  const salesList = (sales.data as any[]) ?? []
-  const invoiceList = (invoices.data as any[]) ?? []
+  const reviewing = review !== 'none'
+  const loading = reviewing
+    ? reviewSales.isLoading && !reviewSales.data
+    : (sales.isLoading && !sales.data) || (invoices.isLoading && !invoices.data)
+  const salesList = ((reviewing ? reviewSales.data : sales.data) as any[]) ?? []
+  const invoiceList = reviewing ? [] : ((invoices.data as any[]) ?? [])
   const all = useMemo(() => mergeOrders(salesList, invoiceList), [salesList, invoiceList])
   const shown = useMemo(() => filterOrders(all, filters), [all, filters])
   const totals = orderTotals(shown)
@@ -200,6 +227,17 @@ export const Orders = ({ view }: { view: OrdersView }) => {
               {p === 'all' ? 'Any payment' : p === 'cash' ? 'Cash' : 'MoMo'}
             </Chip>
           ))}
+          {view !== 'pending' && (
+            <>
+              <span className="mx-1 w-px bg-stone-200" aria-hidden />
+              <Chip on={review === 'stockShort'} onClick={() => setReview((r) => (r === 'stockShort' ? 'none' : 'stockShort'))}>
+                Stock went short
+              </Chip>
+              <Chip on={review === 'priceMismatch'} onClick={() => setReview((r) => (r === 'priceMismatch' ? 'none' : 'priceMismatch'))}>
+                Price differs
+              </Chip>
+            </>
+          )}
         </div>
       </Card>
 
@@ -246,6 +284,7 @@ export const Orders = ({ view }: { view: OrdersView }) => {
                         <span className="hidden sm:inline">
                           <StatusBadge o={o} />
                         </span>
+                        <ReviewFlags o={o} />
                       </span>
                       <span className="block truncate text-xs text-stone-500">
                         {o.kind === 'invoice' ? o.customerName : 'Counter sale'} · {o.lines.length} item{o.lines.length === 1 ? '' : 's'} ·{' '}
@@ -308,7 +347,16 @@ export const Orders = ({ view }: { view: OrdersView }) => {
               {open.paidAt && open.kind === 'invoice' && open.status === 'paid' && (
                 <span className="text-xs text-stone-500">Paid {formatDate(open.paidAt)}</span>
               )}
+              {open.receiptNo && open.receiptNo !== open.ref && (
+                <span className="text-xs text-stone-500">Till receipt {open.receiptNo}</span>
+              )}
+              <ReviewFlags o={open} />
             </div>
+            {open.stockShort && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                This sale took stock below zero — it was sold while the till was offline. Recount these products and adjust the stock.
+              </p>
+            )}
             {open.kind === 'invoice' ? (
               <div className="rounded-xl bg-stone-50 px-3 py-2.5 text-sm">
                 <p className="font-semibold text-stone-900">{open.customerName}</p>
@@ -341,6 +389,9 @@ export const Orders = ({ view }: { view: OrdersView }) => {
                       <p className="text-xs text-stone-500">
                         {l.quantity} × {l.unitName} @ {money(l.unitPrice)}
                         {l.pricingType === 'wholesale' && ' · wholesale'}
+                        {l.priceMismatch && (
+                          <span className="font-semibold text-amber-700"> · till price (catalogue {money(l.catalogPrice ?? 0)})</span>
+                        )}
                       </p>
                     </td>
                     <td className="py-2 text-right font-semibold tabular-nums">{money(l.subtotal)}</td>

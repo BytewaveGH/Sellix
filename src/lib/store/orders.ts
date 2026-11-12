@@ -13,6 +13,9 @@ export interface OrderLine {
   unitPrice: number
   subtotal: number
   pricingType?: string
+  // The till charged a price other than the catalogue's (offline sale, §13.1).
+  priceMismatch?: boolean
+  catalogPrice?: number
 }
 
 export interface Order {
@@ -31,7 +34,18 @@ export interface Order {
   lines: OrderLine[]
   cashier?: string
   warehouse?: string
+  // Rung up offline: saved on the till, not yet recorded by the server.
+  offline?: boolean
+  // The number the till printed ("7D3F-0042"), before the server knew the sale.
+  receiptNo?: string
+  // Stock went below zero with this sale (sold offline from stock not on record).
+  stockShort?: boolean
+  // At least one item was charged at the till's price instead of the catalogue's.
+  priceMismatch?: boolean
 }
+
+// A sale made offline has a temporary (negative) id until it's sent.
+export const offlineRef = (id: number) => `OFF-${String(-id).slice(-6)}`
 
 const num = (v: unknown) => Number(v ?? 0) || 0
 const lines = (items: unknown): OrderLine[] =>
@@ -42,23 +56,29 @@ const lines = (items: unknown): OrderLine[] =>
     unitPrice: num(i.unitPrice),
     subtotal: num(i.subtotal),
     pricingType: i.pricingType,
+    ...(i.priceMismatch ? { priceMismatch: true, catalogPrice: num(i.catalogPrice) } : {}),
   }))
 
 export const saleToOrder = (s: any): Order => ({
   key: `sale-${s.id}`,
   kind: 'sale',
   id: s.id,
-  ref: `S-${s.id}`,
-  date: s.createdAt ?? '',
+  ref: num(s.id) < 0 ? s.receiptNo || offlineRef(num(s.id)) : `S-${s.id}`,
+  // When it was sold, which for a sale made offline is before it reached the server.
+  date: s.soldAt ?? s.createdAt ?? '',
   customerName: '',
   customerPhone: '',
   paymentType: s.paymentType ?? '',
   status: 'paid',
-  paidAt: s.createdAt,
+  paidAt: s.soldAt ?? s.createdAt,
   total: num(s.totalAmount),
   lines: lines(s.items),
   cashier: s.employeeName || undefined,
   warehouse: s.warehouseName || undefined,
+  ...(num(s.id) < 0 ? { offline: true } : {}),
+  ...(s.receiptNo ? { receiptNo: String(s.receiptNo) } : {}),
+  ...(s.stockShort ? { stockShort: true } : {}),
+  ...(s.priceMismatch || (Array.isArray(s.items) && s.items.some((i: any) => i?.priceMismatch)) ? { priceMismatch: true } : {}),
 })
 
 export const invoiceToOrder = (i: any): Order => ({
@@ -87,6 +107,10 @@ export const mergeOrders = (sales: any[], invoices: any[]): Order[] =>
 
 export type OrdersView = 'all' | 'pending' | 'completed'
 
+// Sales for the owner to look at again (§13.4): stock that went below zero, or
+// a till price that differed from the catalogue. Fetched with the server's own filter.
+export type OrderReview = 'none' | 'stockShort' | 'priceMismatch'
+
 export interface OrderFilters {
   view: OrdersView
   kind: 'all' | OrderKind
@@ -112,6 +136,7 @@ export const filterOrders = (orders: Order[], f: OrderFilters, now = new Date())
     if (!q) return true
     return (
       o.ref.toLowerCase().includes(q) ||
+      (o.receiptNo ?? '').toLowerCase().includes(q) ||
       String(o.id) === q ||
       o.customerName.toLowerCase().includes(q) ||
       o.customerPhone.replace(/\s/g, '').includes(q.replace(/\s/g, '')) ||

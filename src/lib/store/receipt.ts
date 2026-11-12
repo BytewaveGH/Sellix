@@ -41,6 +41,8 @@ export const receiptData = (order: Order, s: StoreSettings, now = new Date()): R
       ...(isInvoice && order.customerName ? [['Customer', order.customerName] as [string, string]] : []),
       ...(isInvoice && order.customerPhone ? [['Phone', formatPhone(order.customerPhone)] as [string, string]] : []),
       ...(!isInvoice && s.receipt.showCashier && order.cashier ? [['Served by', order.cashier] as [string, string]] : []),
+      ...(order.receiptNo && order.receiptNo !== order.ref ? [['Till no.', order.receiptNo] as [string, string]] : []),
+      ...(order.offline ? [['Note', 'Made offline · syncs later'] as [string, string]] : []),
     ],
     items: order.lines.map((l) => ({
       name: l.productName,

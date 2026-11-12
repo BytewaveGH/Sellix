@@ -7,6 +7,9 @@
 import type { AxiosRequestConfig } from 'axios'
 import { apiErrorMessage, apiStatus } from '@/lib/api-error'
 import { isUnreachableError } from '@/lib/network'
+import { offlineKind, type OfflineConfig } from '@/lib/offline/adapter'
+import { listIn, refusalMessage, withList } from '@/lib/offline/rules'
+import { newClientId, tillFields } from '@/lib/till'
 import { SalesServices } from './services'
 import type { CartItem, CustomerType } from './types'
 
@@ -14,10 +17,17 @@ export type SalePayload = {
   // Made by the till, kept when the same sale is sent again, so the server can
   // ignore a repeat instead of recording it twice (BACKEND_REQUIREMENTS §13.1).
   clientId?: string
+  // Printed on the receipt before the server has seen the sale (§13.1).
+  receiptNo?: string
+  deviceId?: string
+  // When the sale happened; it may reach the server much later.
+  soldAt?: string
   paymentType: 'cash' | 'momo'
   warehouseId: number
   employeeId?: number
-  items: { productUnitId: number; quantity: number; pricingType: CustomerType }[]
+  // `unitPrice`: what the customer paid. Only sent for sales kept offline — a
+  // live sale is charged the catalogue price.
+  items: { productUnitId: number; quantity: number; pricingType: CustomerType; unitPrice?: number }[]
 }
 
 export type SaleSessionUser = { accountType?: string; userId?: number } | null | undefined
@@ -32,9 +42,18 @@ export const saleAttribution = (user: SaleSessionUser): { employeeId?: number } 
 
 export const buildSalePayload = (
   cart: CartItem[],
-  opts: { paymentType: 'cash' | 'momo'; warehouseId: number; customerType: CustomerType; user: SaleSessionUser; clientId?: string }
+  opts: {
+    paymentType: 'cash' | 'momo'
+    warehouseId: number
+    customerType: CustomerType
+    user: SaleSessionUser
+    clientId?: string
+    receiptNo?: string
+    at?: Date
+  }
 ): SalePayload => ({
   ...(opts.clientId ? { clientId: opts.clientId } : {}),
+  ...(opts.receiptNo ? tillFields(opts.receiptNo, opts.at) : {}),
   paymentType: opts.paymentType,
   warehouseId: opts.warehouseId,
   ...saleAttribution(opts.user),
@@ -52,6 +71,7 @@ export type ReceiptLine = {
 
 export type SaleReceipt = {
   id?: number
+  receiptNo?: string
   paymentType: string
   totalAmount: number
   items: ReceiptLine[]
@@ -67,7 +87,8 @@ export type CheckoutFailure =
   | { ok: false; kind: 'unconfirmed'; message: string }
   | { ok: false; kind: 'other'; message: string }
 
-export type CheckoutResult = { ok: true; receipt: SaleReceipt } | CheckoutFailure
+// `offline`: saved on this till and sent when the connection is back.
+export type CheckoutResult = { ok: true; receipt: SaleReceipt; offline?: boolean } | CheckoutFailure
 
 // "insufficient stock for product 12: have 20, need 27 base units"
 export const parseInsufficientStock = (message: string) => {
@@ -77,9 +98,10 @@ export const parseInsufficientStock = (message: string) => {
 
 const toReceipt = (sale: any): SaleReceipt => ({
   id: sale?.id,
+  receiptNo: sale?.receiptNo ?? undefined,
   paymentType: sale?.paymentType ?? '',
   totalAmount: Number(sale?.totalAmount ?? 0),
-  createdAt: sale?.createdAt,
+  createdAt: sale?.soldAt ?? sale?.createdAt,
   items: (Array.isArray(sale?.items) ? sale.items : []).map((i: any) => ({
     productUnitId: Number(i.productUnitId),
     productName: i.productName ?? '',
@@ -90,16 +112,17 @@ const toReceipt = (sale: any): SaleReceipt => ({
   })),
 })
 
-export const classifyCheckoutError = (err: any): CheckoutFailure => {
+// `names`: product unit id → name on the till, for "no longer exists" refusals.
+export const classifyCheckoutError = (err: any, names: Record<string, string> = {}): CheckoutFailure => {
   const status = apiStatus(err)
   if (!status || isUnreachableError(err))
     return { ok: false, kind: 'unconfirmed', message: 'The connection dropped before Sellix confirmed this sale.' }
-  const message = apiErrorMessage(err, 'The sale could not be completed.')
+  const message = refusalMessage(err?.response?.data?.code, apiErrorMessage(err, 'The sale could not be completed.'), names)
   if (status === 409) {
     const parsed = parseInsufficientStock(message)
     return { ok: false, kind: 'stock', message: `Not enough stock — nothing was charged. ${message}`, productId: parsed?.productId }
   }
-  if (status === 422) return { ok: false, kind: 'invalid', message: `Some items are invalid: ${message}` }
+  if (status === 422) return { ok: false, kind: 'invalid', message: err?.response?.data?.code ? message : `Some items are invalid: ${message}` }
   return { ok: false, kind: 'other', message }
 }
 
@@ -107,16 +130,79 @@ export const classifyCheckoutError = (err: any): CheckoutFailure => {
 // staring at "Processing…" when the connection has gone.
 export const SALE_TIMEOUT_MS = 20_000
 
-export const submitSale = async (request: (config: AxiosRequestConfig) => Promise<any>, payload: SalePayload): Promise<CheckoutResult> => {
+// Offline, the sale is kept on the till (lib/offline) and shown with the
+// till's own prices, which are sent with it: the customer already paid them.
+export type OfflineSale = {
+  // The receipt as the till worked it out, one item per payload item.
+  preview: SaleReceipt
+}
+
+const unitNames = (preview: SaleReceipt) =>
+  Object.fromEntries(preview.items.map((i) => [String(i.productUnitId), `${i.productName}${i.unitName ? ` (${i.unitName})` : ''}`]))
+
+export const submitSale = async (
+  request: (config: AxiosRequestConfig) => Promise<any>,
+  payload: SalePayload,
+  offline?: OfflineSale
+): Promise<CheckoutResult> => {
+  const names = offline ? unitNames(offline.preview) : {}
+  const config: AxiosRequestConfig & OfflineConfig = {
+    ...(SalesServices.Create(payload) as AxiosRequestConfig),
+    timeout: SALE_TIMEOUT_MS,
+    offline: offline
+      ? {
+          label: `Sale ${payload.receiptNo ?? ''} · ₵${offline.preview.totalAmount.toFixed(2)} · ${offline.preview.paymentType}`.replace('  ', ' '),
+          result: () => ({ ...offline.preview, receiptNo: payload.receiptNo, createdAt: offline.preview.createdAt ?? new Date().toISOString() }),
+          // The server recognises the clientId and never records it twice.
+          safeToRepeat: !!payload.clientId,
+          body: () => ({
+            ...payload,
+            items: payload.items.map((it, i) => ({ ...it, unitPrice: Math.round((offline.preview.items[i]?.unitPrice ?? 0) * 100) / 100 })),
+          }),
+          names,
+          adjust: (key, body) => (/^\/products(\?|$)/.test(key) ? deductSoldStock(body, payload) : undefined),
+        }
+      : undefined,
+  }
   try {
-    const res = await request({ ...(SalesServices.Create(payload) as AxiosRequestConfig), timeout: SALE_TIMEOUT_MS })
+    const res = await request(config)
     const sale = res?.data?.data ?? res?.data
+    if (offlineKind(res) === 'queued') return { ok: true, offline: true, receipt: toReceipt(sale) }
     // The server sent our id back: it knows to ignore repeats, so a retry is safe.
     if (payload.clientId && sale?.clientId === payload.clientId) rememberRetriesSafe()
     return { ok: true, receipt: toReceipt(sale) }
   } catch (err) {
-    return classifyCheckoutError(err)
+    return classifyCheckoutError(err, names)
   }
+}
+
+// The kept product list with a sale's stock taken out, so the till's stock
+// warnings stay right while offline. Stock is in base units (quantity × baseQuantity).
+export const deductSoldStock = (body: unknown, sale: Pick<SalePayload, 'warehouseId' | 'items'>): unknown => {
+  const products = listIn(body)
+  if (!products) return undefined
+  const sold = new Map<string, number>()
+  for (const p of products as any[]) {
+    for (const u of Array.isArray(p?.units) ? p.units : []) {
+      const line = sale.items.find((i) => i.productUnitId === Number(u.id))
+      if (line) sold.set(String(p.id), (sold.get(String(p.id)) ?? 0) + line.quantity * (Number(u.baseQuantity) || 1))
+    }
+  }
+  if (sold.size === 0) return undefined
+  return withList(
+    body,
+    (products as any[]).map((p) => {
+      const n = sold.get(String(p.id))
+      if (!n) return p
+      return {
+        ...p,
+        ...(typeof p.totalQuantity === 'number' ? { totalQuantity: p.totalQuantity - n } : {}),
+        ...(Array.isArray(p.stock)
+          ? { stock: p.stock.map((s: any) => (Number(s.warehouseId) === sale.warehouseId ? { ...s, quantity: Number(s.quantity) - n } : s)) }
+          : {}),
+      }
+    })
+  )
 }
 
 // ── Sending the same sale again ──────────────────────────────────────────────
@@ -124,15 +210,9 @@ export const submitSale = async (request: (config: AxiosRequestConfig) => Promis
 // clientId: once the backend supports it (§13.1) the repeat is ignored rather
 // than recorded twice. A changed cart is a new sale with a new id.
 
-export type PendingSale = { clientId: string; signature: string }
+export type PendingSale = { clientId: string; receiptNo: string; signature: string }
 
-export const newClientId = () =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0
-        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-      })
+export { newClientId }
 
 // What makes two attempts "the same sale": payment, warehouse and items.
 export const saleSignature = (p: Omit<SalePayload, 'clientId'>) =>

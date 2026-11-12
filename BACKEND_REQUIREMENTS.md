@@ -873,6 +873,22 @@ Shops lose internet often. The plan is for the till (POS) to keep selling while 
 3. After a long outage it sends many sales at once.
 4. The catalogue is kept on the PC and updated with "what changed since last time".
 
+**What the app already does** (no backend change needed for these):
+
+- Every module (retail, eatery, real estate, amusement) keeps the last answer to each read on the PC and shows it while offline. The app's screens are kept too (service worker), so it opens with no internet.
+- While offline, new sales, counter orders and edits are saved on the PC and sent with the normal endpoints, in order, once the connection returns. Rows made offline get a temporary negative id, swapped for the server's id before later changes to them are sent.
+- A change is only kept if it was never sent. If a send gets no reply and the server can't recognise a repeat, the app asks a person to check rather than sending it again.
+
+**Status (frontend, after the backend shipped §13):** the app uses all of it.
+
+- **Till sales and counter orders:** they carry `clientId`, `receiptNo`, `deviceId` and `soldAt`. When kept offline they also carry the price paid per item.
+- **Sending:** they go up through `/sync/sales` and `/eatery/sync/orders` in batches of up to 200, with `X-Device-Id`.
+- **Catalogue and menu:** kept current with `/sync/changes` and `/eatery/sync/changes`.
+- **Cashiers:** refresh through `/employees/refresh`.
+- **Review:** the orders screen has "Stock went short" and "Price differs" views.
+
+The four problems below are what §13 fixed.
+
 Today's sale endpoint can't support this safely, for four reasons:
 
 - **Duplicates on retry.** `POST /sales` has no ID from the till, so a retry after a lost reply records the sale twice.

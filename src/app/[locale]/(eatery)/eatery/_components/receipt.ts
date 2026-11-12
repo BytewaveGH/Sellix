@@ -123,7 +123,8 @@ export const receiptPreviewHtml = (r: Restaurant, paper: PaperWidth) => receiptP
 
 // Prints on this device's receipt printer (80 mm, 58 mm or A4).
 export const printReceipt = async (order: Order, restaurant: Restaurant, trackUrl?: string) => {
-  const qr = trackUrl ? await QRCode.toString(trackUrl, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }).catch(() => '') : ''
+  // An order made offline (temporary id) can't be followed until it's sent.
+  const qr = trackUrl && order.id > 0 ? await QRCode.toString(trackUrl, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }).catch(() => '') : ''
   return printHtml(receiptPage(receiptData(order, restaurant, qr)))
 }
 
