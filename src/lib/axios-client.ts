@@ -4,8 +4,11 @@ import { getSession } from 'next-auth/react'
 import { apiErrorMessage, isSessionRebindError } from './api-error'
 import { forceLogout } from './force-logout'
 import { reportReachable, reportUnreachable } from './connection'
-import { isUnreachableError } from './network'
+import { isUnreachableError, refreshOutcome } from './network'
+import { refreshOnServer } from './session-refresh'
 import { BILLING_CHANGED_EVENT } from './subscription/events'
+import { offlineKind, withOffline, type OfflineConfig } from './offline/adapter'
+import type { SendRequest } from './offline/engine'
 
 let isRefreshing = false
 // Requests waiting for the refresh in progress. Each is resumed or failed with it.
@@ -15,6 +18,26 @@ export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
 })
 
+// Whose data a request is about: cached answers and waiting changes are kept per business and user.
+export const sessionScope = (user?: { tenant?: string; userId?: number | string; username?: string } | null) =>
+  user?.tenant ? `${user.tenant}:${user.userId ?? user.username ?? ''}` : undefined
+
+// Sends a change that was kept on this device (it goes through the same
+// sign-in and refresh handling as any request).
+export const sendQueued = (op: SendRequest) =>
+  apiClient.request({
+    method: op.method,
+    url: op.url,
+    params: op.params,
+    data: op.data,
+    timeout: op.timeout,
+    headers: op.headers,
+    _replay: true,
+  } as AxiosRequestConfig & OfflineConfig)
+
+// Working offline (lib/offline): reads come from the device, writes wait.
+apiClient.defaults.adapter = withOffline(axios.getAdapter(axios.defaults.adapter), sendQueued)
+
 // Real-estate screens show "tenant mismatch" as an error panel instead of
 // signing out (their error contract: a 403 never refreshes or logs out).
 const isRealEstateUrl = (url?: string) => /(^|\/)real-estate\//.test(url ?? '')
@@ -22,6 +45,7 @@ const isRealEstateUrl = (url?: string) => /(^|\/)real-estate\//.test(url ?? '')
 apiClient.interceptors.request.use(async (config) => {
   ;(config as { _startedAt?: number })._startedAt = Date.now()
   const session = await getSession()
+  ;(config as OfflineConfig)._scope = sessionScope(session?.user)
   if (session?.user?.accessToken) {
     // A retry after a refresh already carries the new token; the session may still hold the old one.
     if (!(config as { _retry?: boolean })._retry) config.headers['Authorization'] = `Bearer ${session.user.accessToken}`
@@ -38,7 +62,8 @@ const elapsed = (config: unknown) => {
 
 apiClient.interceptors.response.use(
   (response) => {
-    reportReachable(elapsed(response.config))
+    // Answered from this device: says nothing about the connection.
+    if (!offlineKind(response)) reportReachable(elapsed(response.config))
     return response
   },
   async (error) => {
@@ -87,9 +112,24 @@ apiClient.interceptors.response.use(
     }
 
     isRefreshing = true
+    let account: 'owner' | 'employee' = 'owner'
     try {
       const session = await getSession()
       if (!session?.user?.refreshToken) throw new Error('no refresh token')
+      account = session.user.accountType === 'employee' ? 'employee' : 'owner'
+
+      if (account === 'employee') {
+        // Cashiers: the app's server refreshes and keeps both new tokens.
+        const next = await refreshOnServer()
+        if (next?.error === 'RefreshAccessTokenError') throw Object.assign(new Error('refresh refused'), { response: { status: 401 } })
+        const newToken = next?.user?.accessToken
+        // Unchanged: the API couldn't be reached for the refresh. Stay signed in.
+        if (!newToken || newToken === session.user.accessToken) throw Object.assign(new Error('refresh unavailable'), { name: 'TypeError' })
+        refreshQueue.forEach((q) => q.resume(newToken))
+        refreshQueue = []
+        if (original.headers) original.headers['Authorization'] = `Bearer ${newToken}`
+        return apiClient(original)
+      }
 
       const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
@@ -111,9 +151,12 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       const waiting = refreshQueue
       refreshQueue = []
-      // The refresh couldn't reach the server: the session may be fine, so keep
-      // it. This request (and those waiting) fail like any request while offline.
-      if (isUnreachableError(refreshError)) {
+      // The refresh couldn't reach the server (or, for a cashier, failed for any
+      // reason but a 401/403): the session may be fine, so keep it. This
+      // request (and those waiting) fail like any request while offline.
+      const status = (refreshError as { response?: { status?: number } })?.response?.status
+      const outcome = status ? refreshOutcome(status, account) : isUnreachableError(refreshError) ? 'unreachable' : 'rejected'
+      if (outcome === 'unreachable') {
         reportUnreachable()
         waiting.forEach((q) => q.fail(refreshError))
         return Promise.reject(refreshError)

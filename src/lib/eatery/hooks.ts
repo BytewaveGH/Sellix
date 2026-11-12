@@ -9,6 +9,8 @@ import { publicApiClient } from '@/lib/public-axios-client'
 import { apiErrorMessage, apiStatus } from '@/lib/api-error'
 import { createApiSource, createLocalSource, DATA_SOURCE_KIND, type EaterySource, type OrderTicket } from './data-source'
 import { prepareImage, type ImageKind } from './images'
+import { itemNames, offlineCounterOrder, offlineOrderBody } from './offline-order'
+import { nextReceiptNo } from '../till'
 import { dressForFestival } from './festivals'
 import type { CounterOrderInput, DirectoryEntry, ResourceMap, ResourceName, Restaurant, StorefrontBundle } from './types'
 
@@ -222,6 +224,22 @@ export const useEateryActions = () => {
   const qc = useQueryClient()
   const [error, setError] = useState<{ message: string } | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['eatery', source.kind] })
+  // The menu already on this device, to price a counter order made offline.
+  const loaded = <R extends ResourceName>(r: R) => (qc.getQueryData(['eatery', source.kind, 'owner', scope, r]) as ResourceMap[R][] | undefined) ?? []
+  const offlinePreview = (restaurantId: number, input: CounterOrderInput) => {
+    const restaurant = loaded('restaurants').find((r) => r.id === restaurantId)
+    if (!restaurant) return undefined
+    const menu = { restaurant, categories: loaded('categories'), items: loaded('items'), promotions: loaded('promotions') }
+    const now = new Date()
+    // Only used if the order has to wait offline; a live order is numbered by the server.
+    let receiptNo: string | undefined
+    const number = () => (receiptNo ??= nextReceiptNo())
+    return {
+      result: (tempId: number) => offlineCounterOrder(menu, input, tempId, now, number()),
+      body: () => offlineOrderBody(menu, input, number(), now),
+      names: itemNames(menu, input),
+    }
+  }
 
   const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false): Promise<T> => {
     setError(null)
@@ -252,7 +270,7 @@ export const useEateryActions = () => {
       run(async () => source.uploadImage(restaurantId, await prepareImage(file, kind), kind), 'Couldn’t upload the image.', true),
     // Counter (POS) order: priced by the source, accepted at once.
     createCounterOrder: (restaurantId: number, input: CounterOrderInput) =>
-      run(() => source.createCounterOrder(restaurantId, input), 'Couldn’t send the order.'),
+      run(() => source.createCounterOrder(restaurantId, input, offlinePreview(restaurantId, input)), 'Couldn’t send the order.'),
     claimDemo: () => run(() => (source.claimDemo ? source.claimDemo() : Promise.resolve([])), 'Couldn’t add the examples.'),
     // Sequential, for building a menu from a preset.
     createMany: <R extends ResourceName>(r: R, bodies: Omit<ResourceMap[R], 'id'>[]) =>

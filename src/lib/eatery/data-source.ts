@@ -58,11 +58,25 @@ export interface EaterySource {
   remove(r: ResourceName, id: number): Promise<void>
   // Staff ring up an order at the counter (POS). Priced like online orders;
   // accepted straight away, so its ingredients leave stock at once.
-  createCounterOrder(restaurantId: number, input: CounterOrderInput): Promise<Order & { accessKey: string }>
+  // `offline`: the order as the till prices it, kept and shown at once if
+  // the connection is down (API only; lib/offline sends it later).
+  createCounterOrder(
+    restaurantId: number,
+    input: CounterOrderInput,
+    offline?: OfflineCounterOrder
+  ): Promise<Order & { accessKey: string }>
   // Stores a prepared logo/cover image (images.ts) and returns its URL.
   uploadImage(restaurantId: number, image: Blob, kind: ImageKind): Promise<string>
   // Local only: hand the example restaurants shown in the directory to this business.
   claimDemo?(): Promise<Restaurant[]>
+}
+
+// A counter order kept on the till while offline (lib/offline): what to show
+// at once, and what to send later (with clientId and the prices paid).
+export type OfflineCounterOrder = {
+  result: (tempId: number) => Order & { accessKey: string }
+  body: () => unknown
+  names: Record<string, string>
 }
 
 // Same shape as an axios error so screens handle local and API errors alike.
@@ -147,7 +161,26 @@ export const createApiSource = (
   remove: async (r, id) => {
     await owner(EateryServices.Delete(r, id))
   },
-  createCounterOrder: async (restaurantId, input) => unwrap(await owner(EateryServices.CounterOrder(restaurantId, input))),
+  createCounterOrder: async (restaurantId, input, offline) =>
+    unwrap(
+      await owner({
+        ...EateryServices.CounterOrder(restaurantId, input),
+        ...(offline
+          ? {
+              offline: {
+                result: offline.result,
+                body: offline.body,
+                names: offline.names,
+                // Carries a clientId: the server never records it twice.
+                safeToRepeat: true,
+                // It belongs on the orders list (and so on the kitchen board).
+                appendTo: '/eatery/orders',
+                label: `Counter order${input.fulfilment.table ? ` · table ${input.fulfilment.table}` : ''}`,
+              },
+            }
+          : {}),
+      } as AxiosRequestConfig)
+    ),
   uploadImage: async (restaurantId, image, kind) => {
     const url = unwrap(await owner(EateryServices.UploadImage(restaurantId, image, kind)))?.url
     if (!url) throw httpError(502, 'The upload didn’t return a link')

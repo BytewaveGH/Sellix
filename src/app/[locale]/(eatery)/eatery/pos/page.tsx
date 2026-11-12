@@ -581,7 +581,7 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
             <CheckCircle2 className="mx-auto h-12 w-12 text-teal-600" />
             <p id="sent-title" className="mt-2 text-lg font-extrabold text-stone-900">
-              Order #{done.code} sent to the kitchen
+              {done.id < 0 ? `Order #${done.code} saved on this till` : `Order #${done.code} sent to the kitchen`}
             </p>
             <p className="text-sm text-stone-500">
               {done.fulfilment.type === 'dine-in' ? (done.fulfilment.table ? `Table ${done.fulfilment.table}` : 'Dine-in') : 'Take-away'} ·{' '}
@@ -592,9 +592,16 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
                 Change {formatMoney(Math.round((done.tendered - done.total) * 100) / 100, r.currency)}
               </p>
             )}
-            <p className="mt-3 text-xs text-stone-500">
-              The receipt has a QR code — the customer can scan it to follow the order and get a ping when it’s ready.
-            </p>
+            {done.id < 0 ? (
+              <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                You’re offline. It’s on this device’s kitchen board now, and reaches other screens as soon as the connection is
+                back.
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-stone-500">
+                The receipt has a QR code — the customer can scan it to follow the order and get a ping when it’s ready.
+              </p>
+            )}
             <div className="mt-5 grid grid-cols-2 gap-2">
               <Button
                 variant="secondary"

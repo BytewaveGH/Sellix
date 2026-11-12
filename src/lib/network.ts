@@ -24,11 +24,18 @@ export const isUnreachableError = (err: unknown): boolean => {
 export type RefreshOutcome = 'ok' | 'rejected' | 'unreachable'
 
 // The token refresh endpoint's answer. `null` = no answer at all (offline,
-// timeout). The account service answers an invalid or expired refresh token
-// with 500 (BACKEND_REQUIREMENTS §13.5 asks for 401), so a plain 500 still
-// counts as rejected; only gateway errors mean "try again later".
-export const refreshOutcome = (status: number | null): RefreshOutcome =>
-  status === null || GATEWAY_DOWN.has(status) ? 'unreachable' : status >= 200 && status < 300 ? 'ok' : 'rejected'
+// timeout).
+// - Owners (/auth/refresh): the account service answers an invalid or expired
+//   refresh token with 500, so a plain 500 still counts as rejected; only
+//   gateway errors mean "try again later".
+// - Cashiers (/employees/refresh): only 401 (session over) or 403 (business
+//   suspended, wrong business) end the session; 400 and 5xx mean try later.
+export const refreshOutcome = (status: number | null, account: 'owner' | 'employee' = 'owner'): RefreshOutcome => {
+  if (status === null) return 'unreachable'
+  if (status >= 200 && status < 300) return 'ok'
+  if (account === 'employee') return status === 401 || status === 403 ? 'rejected' : 'unreachable'
+  return GATEWAY_DOWN.has(status) ? 'unreachable' : 'rejected'
+}
 
 // Requests slower than this make the connection count as slow.
 export const SLOW_MS = 4000

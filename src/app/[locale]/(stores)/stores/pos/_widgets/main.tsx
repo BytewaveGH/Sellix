@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Search, Plus, Minus, Trash2, ShoppingCart, Package, X, Zap, ScanLine, Barcode, CheckCircle2, Printer } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, Package, X, Zap, ScanLine, Barcode, CheckCircle2, Printer, CloudOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PopoverTemplate } from '@/components/templates/popover'
 import { Sheet, SheetContent, SheetClose } from '@/components/ui/sheet'
@@ -26,6 +26,7 @@ import {
   type SaleReceipt,
 } from '../_logics/checkout'
 import { useConnection } from '@/lib/connection'
+import { nextReceiptNo, tillFields } from '@/lib/till'
 import { looksLikeBarcode, scoreProduct } from '../_logics/scanner/text-match'
 import { primeFeedback } from '../_logics/scanner/feedback'
 import { RECOGNITION_CONFIG } from '../_logics/scanner/config'
@@ -322,7 +323,8 @@ const Main = () => {
   const [scannerOpen, setScannerOpen] = useState(false)
   // Checkout feedback: server error (cart kept) or the server's receipt.
   const [checkoutError, setCheckoutError] = useState<{ message: string; productId?: string } | null>(null)
-  const [receipt, setReceipt] = useState<SaleReceipt | null>(null)
+  // `offline`: saved on this till, recorded when the connection is back.
+  const [receipt, setReceipt] = useState<(SaleReceipt & { offline?: boolean }) | null>(null)
 
   // Store settings: starting warehouse and prices, payment methods, receipts.
   const { settings: storeSettings, loaded: settingsLoaded } = useStoreSettings()
@@ -390,7 +392,7 @@ const Main = () => {
   const { data: warehousesData } = useFetchData('warehouses', WarehouseServices.FetchAll() as unknown as IGeneric)
   const warehouses = (warehousesData as any[] | undefined) ?? []
 
-  const { data: rawProducts, isLoading } = useFetchData('pos-products', ProductServices.FetchAll({ limit: 1000, offset: 0 }))
+  const { data: rawProducts, isLoading, refetch: refetchProducts } = useFetchData('pos-products', ProductServices.FetchAll({ limit: 1000, offset: 0 }))
 
   const products: Product[] = useMemo(() => ((rawProducts as any[] | undefined) ?? []).map(mapApiProduct), [rawProducts])
 
@@ -490,9 +492,8 @@ const Main = () => {
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
   const hasOverStock = Object.keys(overStock).length > 0
   // Stock warnings are advisory — the server re-checks atomically and answers 409.
-  // Offline, a sale can't be recorded yet (offline selling is the next step):
-  // block it and keep the cart, rather than fail after a long wait.
-  const canCharge = cart.length > 0 && !!warehouseId && !isSubmitting && !offline
+  // Offline, the sale is saved on this till and sent when the connection is back.
+  const canCharge = cart.length > 0 && !!warehouseId && !isSubmitting
 
   const handleCharge = async (paymentType: 'momo' | 'cash') => {
     if (!canCharge) return
@@ -502,9 +503,28 @@ const Main = () => {
     const base = buildSalePayload(cart, { paymentType, warehouseId, customerType, user: session?.user })
     const signature = saleSignature(base)
     const clientId = clientIdFor(pendingSale.current, signature)
-    const result = await submitSale(request, { ...base, clientId })
+    // The till's own prices, shown (and printed) if the sale has to wait offline.
+    const preview: SaleReceipt = {
+      paymentType,
+      totalAmount: total,
+      createdAt: new Date().toISOString(),
+      items: cart.map((i) => {
+        const subtotal = getLineTotal(i)
+        return {
+          productUnitId: Number(i.selectedUnit),
+          productName: i.name,
+          unitName: i.unitLabel,
+          quantity: i.quantity,
+          unitPrice: i.quantity ? subtotal / i.quantity : 0,
+          subtotal,
+        }
+      }),
+    }
+    // A retry of the same cart keeps its receipt number too.
+    const receiptNo = pendingSale.current?.clientId === clientId ? pendingSale.current.receiptNo : nextReceiptNo()
+    const result = await submitSale(request, { ...base, clientId, ...tillFields(receiptNo) }, { preview })
     setIsSubmitting(false)
-    pendingSale.current = !result.ok && result.kind === 'unconfirmed' ? { clientId, signature } : null
+    pendingSale.current = !result.ok && result.kind === 'unconfirmed' ? { clientId, receiptNo, signature } : null
     if (!result.ok && result.kind === 'unconfirmed') {
       setCheckoutError({ message: unconfirmedMessage(retriesAreSafe()) })
       return
@@ -512,7 +532,9 @@ const Main = () => {
     if (result.ok) {
       clearCart()
       setCartSheetOpen(false)
-      setReceipt(result.receipt)
+      setReceipt({ ...result.receipt, offline: result.offline })
+      // Stock went down (offline too: the kept list was updated with the sale).
+      void refetchProducts()
       if (storeSettings.receipt.autoPrint) printReceipt(result.receipt)
     } else {
       // 409 / 422 / network: keep the cart so the cashier can adjust.
@@ -668,7 +690,8 @@ const Main = () => {
           <div role="status" className="flex items-start gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 mb-1">
             <span className="text-rose-500 text-xs">⚠</span>
             <p className="text-xs text-rose-700">
-              <span className="font-bold">You’re offline.</span> Sales can’t be recorded until the connection is back — the cart is kept.
+              <span className="font-bold">You’re offline.</span> Keep selling: sales are saved on this till and recorded when the
+              connection is back.
             </p>
           </div>
         )}
@@ -1073,10 +1096,15 @@ const Main = () => {
             className="relative bg-white w-full md:w-[420px] rounded-t-3xl md:rounded-3xl p-5 max-h-[85dvh] flex flex-col"
           >
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <p className="font-bold text-stone-800">Sale recorded</p>
+              {receipt.offline ? <CloudOff className="h-5 w-5 text-sky-600" /> : <CheckCircle2 className="h-5 w-5 text-green-600" />}
+              <p className="font-bold text-stone-800">{receipt.offline ? 'Sale saved on this till' : 'Sale recorded'}</p>
               <span className="ml-auto text-xs text-gray-400 capitalize">{receipt.paymentType}</span>
             </div>
+            {receipt.offline && (
+              <p className="mb-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-800">
+                You’re offline. This sale will be recorded as soon as the connection is back — nothing else to do.
+              </p>
+            )}
             <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
               {receipt.items.map((i) => (
                 <div key={i.productUnitId} className="flex items-center gap-2 py-2 text-sm">

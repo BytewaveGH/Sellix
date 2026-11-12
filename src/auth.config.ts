@@ -84,7 +84,6 @@ async function employeeLoginRequest(body: { email: string; password: string }, t
       return null
     }
     const raw = await response.json()
-    console.log('[auth] employee login response:', JSON.stringify(raw))
     // Support both { data: { user, accessToken, ... } } and flat { user, accessToken, ... }
     const payload = raw.data ?? raw
     return { ...payload, tenant }
@@ -103,7 +102,39 @@ const toAbsoluteExpiry = (v: number | undefined | null): number => {
 // Only a real refusal ends the session. When the API can't be reached (down,
 // slow, a gateway error) the token is kept as it is and the refresh is tried
 // again on the next session check — poor internet must not log anyone out.
+// Cashiers: POST /employees/refresh with the refresh token in the body. Both
+// tokens are replaced each time (the refresh token rotates; it lasts 14 days).
+async function refreshEmployeeToken(tokenObject: any) {
+  if (!tokenObject.refreshToken) return { ...tokenObject, error: 'RefreshAccessTokenError' }
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(tokenObject.tenant ? { 'X-Tenant-Domain': tokenObject.tenant as string } : {}) },
+      body: JSON.stringify({ refreshToken: tokenObject.refreshToken }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    const outcome = refreshOutcome(response.status, 'employee')
+    if (outcome === 'unreachable') return tokenObject
+    if (outcome === 'rejected') return { ...tokenObject, error: 'RefreshAccessTokenError' }
+    const json = await response.json()
+    const d = json?.data ?? json
+    if (!d?.token && !d?.accessToken) return tokenObject
+    return {
+      ...tokenObject, // keeps permissions
+      accessToken: d.token ?? d.accessToken,
+      refreshToken: d.refreshToken ?? tokenObject.refreshToken,
+      accessTokenExpiry: toAbsoluteExpiry(d.expireAt ?? d.accessTokenExpiry),
+      refreshTokenExpiry: d.refreshTokenExpiry ? toAbsoluteExpiry(d.refreshTokenExpiry) : tokenObject.refreshTokenExpiry,
+      error: undefined,
+    }
+  } catch {
+    // No answer (offline, timeout): keep the cashier signed in and try later.
+    return tokenObject
+  }
+}
+
 async function refreshAccessToken(tokenObject: any) {
+  if (tokenObject.accountType === 'employee') return refreshEmployeeToken(tokenObject)
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
       method: 'POST',
@@ -295,6 +326,12 @@ export default {
 
   callbacks: {
     async jwt({ token, user, session, trigger }) {
+      // `update({ refresh: true })` from the browser: refresh here, so the new
+      // tokens are kept in the session (cashier refresh tokens rotate).
+      if (trigger === 'update' && session?.refresh) {
+        if (token.accountType === 'super-admin') return token
+        return refreshAccessToken(token)
+      }
       if (trigger === 'update') return { ...token, ...session.user }
       if (user) {
         const u = user as ExtendedUser
@@ -353,6 +390,8 @@ export default {
       session.user.canManageOperations = token.canManageOperations as boolean
       session.user.canManageWarehouses = token.canManageWarehouses as boolean
       session.user.canManageEmployees = token.canManageEmployees as boolean
+      // A refresh the server refused: the browser signs out (refresh-token-handler).
+      if (token.error) (session as { error?: unknown }).error = token.error
       return session
     },
   },
