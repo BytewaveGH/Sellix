@@ -1,6 +1,5 @@
 'use client'
 
-import { SellixLogo } from '@/components/brand/sellix-logo'
 import * as z from 'zod'
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -111,122 +110,110 @@ export default function SignInForm() {
   const orderedChoices = choices ? [...choices].sort((a, b) => Number(b.slug === hostSlug) - Number(a.slug === hostSlug)) : null
 
   return (
-    <div className="w-full px-12 flex justify-center">
+    // Laid out by AuthShell (the module's picture and "Powered by Sellix").
+    <div className="grid items-center gap-1.5 w-full">
       <ToastTemplate position="top-right" />
-
-      <div className="flex flex-col justify-center items-center h-svh py-10 w-full">
-        <div className="flex justify-center w-full">
-          <h1>
-            <SellixLogo size={48} />
-          </h1>
-        </div>
-        <div className="w-full flex justify-center">
-          <div className="grid items-center gap-1.5 mt-40 ml-6 w-[500px]">
-            <div className="bytewave-heading font-mulish-regular text-gray-700 mb-4">{signInText('logIn')}</div>
-            {notice && !error && (
-              <p className="text-center bytewave-paragraph text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
-                {notice}
-              </p>
-            )}
-            {error && (
-              <p role="alert" className="text-center bytewave-sub-heading text-red-500 font-mulish-regular italic">
-                {error}
-              </p>
-            )}
-            {orderedChoices ? (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-base font-bold text-stone-900">Choose a business</p>
-                  <p className="text-sm text-stone-500 mt-0.5">
-                    {form.getValues('email')} signs in to several businesses with this password.
-                  </p>
-                </div>
-                <ul className="flex flex-col gap-2" aria-label="Your businesses">
-                  {orderedChoices.map((b) => {
-                    const meta = verticalMeta(b.appType)
-                    const Icon = meta.icon
-                    const busy = signingInto === b.slug
-                    return (
-                      <li key={b.slug}>
-                        <button
-                          type="button"
-                          onClick={() => void chooseBusiness(b.slug)}
-                          disabled={!!signingInto}
-                          className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 text-left transition-colors hover:border-endeavour/50 hover:bg-endeavour/[0.03] disabled:opacity-60"
-                        >
-                          <span
-                            className="h-10 w-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-                            style={{ background: meta.color }}
-                          >
-                            <Icon className="h-5 w-5" strokeWidth={1.75} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-semibold text-stone-900 truncate">{b.name}</span>
-                            <span className="block text-xs text-stone-500 truncate">
-                              {meta.label} · {b.slug}
-                            </span>
-                          </span>
-                          {b.slug === hostSlug && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide rounded-full bg-endeavour/10 text-endeavour px-2 py-0.5">
-                              This site
-                            </span>
-                          )}
-                          {busy ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-endeavour" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-stone-300" />
-                          )}
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-                <button
-                  type="button"
-                  onClick={backToForm}
-                  className="self-start inline-flex items-center gap-1.5 text-sm font-semibold text-endeavour hover:underline mt-1"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Use a different email or password
-                </button>
-              </div>
-            ) : (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)}>
-                  <InputsTemplate control={form.control} name="email" label="Email" placeholder="Enter your email" />
-                  <InputsTemplate
-                    control={form.control}
-                    isPassword
-                    name="password"
-                    inputType={states.showPassword}
-                    label={`${signInText('password')}`}
-                    parentClassname="mt-4"
-                    placeholder="XXXXXXXXX"
-                  />
-                  <div className="mt-4 ml-1">
-                    <CheckboxTemplate
-                      handleValueChange={(e) => {
-                        UpdateStates(setStates, 'showPassword', e ? 'text' : 'password')
-                      }}
-                      label={`${signInText('showPassword')}`}
-                      className=""
-                    />
-                  </div>
-                  <div className="text-right bytewave-paragraph mt-6 hover:cursor-pointer hover:underline text-endeavour">
-                    <Link href={`/${locale}/forgot-password`}>{`${signInText('forgotPassword')}`}</Link>
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={states.isLoading}
-                    className="bg-endeavour text-white text-xs w-full mt-5 hover:bg-veniceBlue h-9 disabled:opacity-60"
-                  >
-                    {states.isLoading ? 'Signing in...' : `${signInText('login')}`}
-                  </Button>
-                </form>
-              </Form>
-            )}
+      <h1 className="text-2xl font-extrabold tracking-tight text-stone-900">{signInText('logIn')}</h1>
+      <p className="bytewave-paragraph text-gray-400 mb-4">Welcome back — sign in to your business.</p>
+      {notice && !error && (
+        <p className="text-center bytewave-paragraph text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-center bytewave-sub-heading text-red-500 font-mulish-regular italic">
+          {error}
+        </p>
+      )}
+      {orderedChoices ? (
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-base font-bold text-stone-900">Choose a business</p>
+            <p className="text-sm text-stone-500 mt-0.5">{form.getValues('email')} signs in to several businesses with this password.</p>
           </div>
+          <ul className="flex flex-col gap-2" aria-label="Your businesses">
+            {orderedChoices.map((b) => {
+              const meta = verticalMeta(b.appType)
+              const Icon = meta.icon
+              const busy = signingInto === b.slug
+              return (
+                <li key={b.slug}>
+                  <button
+                    type="button"
+                    onClick={() => void chooseBusiness(b.slug)}
+                    disabled={!!signingInto}
+                    className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 text-left transition-colors hover:border-endeavour/50 hover:bg-endeavour/[0.03] disabled:opacity-60"
+                  >
+                    <span
+                      className="h-10 w-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+                      style={{ background: meta.color }}
+                    >
+                      <Icon className="h-5 w-5" strokeWidth={1.75} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-stone-900 truncate">{b.name}</span>
+                      <span className="block text-xs text-stone-500 truncate">
+                        {meta.label} · {b.slug}
+                      </span>
+                    </span>
+                    {b.slug === hostSlug && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide rounded-full bg-endeavour/10 text-endeavour px-2 py-0.5">
+                        This site
+                      </span>
+                    )}
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-endeavour" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-stone-300" />
+                    )}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          <button
+            type="button"
+            onClick={backToForm}
+            className="self-start inline-flex items-center gap-1.5 text-sm font-semibold text-endeavour hover:underline mt-1"
+          >
+            <ArrowLeft className="h-4 w-4" /> Use a different email or password
+          </button>
         </div>
-      </div>
+      ) : (
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <InputsTemplate control={form.control} name="email" label="Email" placeholder="Enter your email" />
+            <InputsTemplate
+              control={form.control}
+              isPassword
+              name="password"
+              inputType={states.showPassword}
+              label={`${signInText('password')}`}
+              parentClassname="mt-4"
+              placeholder="XXXXXXXXX"
+            />
+            <div className="mt-4 ml-1">
+              <CheckboxTemplate
+                handleValueChange={(e) => {
+                  UpdateStates(setStates, 'showPassword', e ? 'text' : 'password')
+                }}
+                label={`${signInText('showPassword')}`}
+                className=""
+              />
+            </div>
+            <div className="text-right bytewave-paragraph mt-6 hover:cursor-pointer hover:underline text-endeavour">
+              <Link href={`/${locale}/forgot-password`}>{`${signInText('forgotPassword')}`}</Link>
+            </div>
+            <Button
+              type="submit"
+              disabled={states.isLoading}
+              className="bg-endeavour text-white text-xs w-full mt-5 hover:bg-veniceBlue h-9 disabled:opacity-60"
+            >
+              {states.isLoading ? 'Signing in...' : `${signInText('login')}`}
+            </Button>
+          </form>
+        </Form>
+      )}
     </div>
   )
 }

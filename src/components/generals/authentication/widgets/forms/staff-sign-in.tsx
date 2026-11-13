@@ -8,7 +8,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useParams } from 'next/navigation'
 import { getSession, signIn } from 'next-auth/react'
 import { Form } from '@/components/ui/form'
-import { SellixLogo } from '@/components/brand/sellix-logo'
 import { Button } from '@/components/ui/button'
 import InputsTemplate from '@/components/templates/inputs'
 import { logoutReasonFromSearch } from '@/lib/force-logout'
@@ -64,58 +63,48 @@ export default function StaffSignInForm() {
   }
 
   return (
-    <div className="w-full px-12 flex justify-center">
-      <div className="flex flex-col justify-center items-center h-svh py-10 w-full">
-        <div className="flex justify-center w-full">
-          <h1>
-            <SellixLogo size={48} tagline="Staff" />
-          </h1>
-        </div>
-        <div className="w-full flex justify-center">
-          <div className="grid items-center gap-1.5 mt-40 ml-6 w-[500px]">
-            <div className="bytewave-heading font-mulish-regular text-gray-700 mb-1">Staff Login</div>
-            <p className="bytewave-paragraph text-gray-400 mb-4">Sign in with your staff credentials</p>
+    // Laid out by AuthShell (the module's picture and "Powered by Sellix").
+    <div className="grid items-center gap-1.5 w-full">
+      <h1 className="text-2xl font-extrabold tracking-tight text-stone-900">Staff sign-in</h1>
+      <p className="bytewave-paragraph text-gray-400 mb-4">Sign in with your staff credentials</p>
 
-            {notice && !error && (
-              <p className="text-center bytewave-paragraph text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
-                {notice}
-              </p>
-            )}
-            {error && <p className="text-center bytewave-sub-heading text-red-500 font-mulish-regular italic mb-2">{error}</p>}
+      {notice && !error && (
+        <p className="text-center bytewave-paragraph text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
+          {notice}
+        </p>
+      )}
+      {error && <p className="text-center bytewave-sub-heading text-red-500 font-mulish-regular italic mb-2">{error}</p>}
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
-                <InputsTemplate control={form.control} name="email" label="Email" placeholder="Enter your email" inputType="email" />
-                <InputsTemplate
-                  control={form.control}
-                  isPassword
-                  name="password"
-                  label="Password"
-                  parentClassname="mt-4"
-                  placeholder="••••••••"
-                />
-                <p className="bytewave-paragraph text-xs text-gray-400 mt-3">
-                  Forgot your password? Ask the owner or a manager to reset it for you from Team.
-                </p>
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="bg-endeavour text-white text-xs w-full mt-4 hover:bg-veniceBlue h-9 disabled:opacity-60"
-                >
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
-            </Form>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <InputsTemplate control={form.control} name="email" label="Email" placeholder="Enter your email" inputType="email" />
+          <InputsTemplate
+            control={form.control}
+            isPassword
+            name="password"
+            label="Password"
+            parentClassname="mt-4"
+            placeholder="••••••••"
+          />
+          <p className="bytewave-paragraph text-xs text-gray-400 mt-3">
+            Forgot your password? Ask the owner or a manager to reset it for you from Team.
+          </p>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="bg-endeavour text-white text-xs w-full mt-4 hover:bg-veniceBlue h-9 disabled:opacity-60"
+          >
+            {isLoading ? 'Signing in...' : 'Sign In'}
+          </Button>
+        </form>
+      </Form>
 
-            <p className="text-center bytewave-paragraph text-gray-400 mt-6">
-              Store owner?{' '}
-              <Link href={`/${locale}`} className="text-endeavour hover:underline">
-                Admin login
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+      <p className="text-center bytewave-paragraph text-gray-400 mt-6">
+        Store owner?{' '}
+        <Link href={`/${locale}`} className="text-endeavour hover:underline">
+          Admin login
+        </Link>
+      </p>
     </div>
   )
 }

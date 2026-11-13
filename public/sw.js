@@ -13,7 +13,10 @@
 const VERSION = 'v1'
 const STATIC = `sellix-static-${VERSION}`
 const PAGES = `sellix-pages-${VERSION}`
-const PAGE_TIMEOUT_MS = 5000
+// Wait this long for the server's page, then open the kept one (refreshed
+// for next time when the server does answer). Slow internet shouldn't mean
+// a slow start.
+const PAGE_TIMEOUT_MS = 1500
 const MAX_STATIC = 800
 
 self.addEventListener('install', () => self.skipWaiting())
