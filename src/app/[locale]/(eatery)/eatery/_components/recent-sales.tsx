@@ -10,6 +10,7 @@ import { formatMoney } from '@/lib/eatery/menu'
 import { dayKey, methodLabel, totalsOf } from '@/lib/eatery/sales'
 import type { Order, Restaurant } from '@/lib/eatery/types'
 import { OrderDetail } from './order-detail'
+import { SyncPill } from './order-bits'
 import { printReceipt, trackingUrl } from './receipt'
 
 // The cashier's view of today: every order so far, today's totals by payment,
@@ -92,6 +93,7 @@ export const RecentSales = ({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="font-extrabold tracking-wider text-stone-900">#{o.code}</span>
+                    <SyncPill order={o} />
                     <span className="ml-2 text-xs text-stone-500">{o.customer.name}</span>
                     <span className="block truncate text-xs text-stone-500">
                       {o.lines.map((l) => `${l.quantity}× ${l.name}`).join(', ')}

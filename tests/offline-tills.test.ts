@@ -79,7 +79,7 @@ describe('sending till sales in batches', () => {
         }
       return { data: { status: true, data: {} } }
     }
-    expect(await syncOutbox(SCOPE, send)).toEqual({ sent: 3, failed: 1, stopped: false })
+    expect(await syncOutbox(SCOPE, send)).toMatchObject({ sent: 3, failed: 1, stopped: false })
     expect(sent.map((r) => `${r.method} ${r.url}`)).toEqual(['POST /sync/sales', 'PUT /sales/9812'])
     expect((sent[0].data as { sales: unknown[] }).sales).toHaveLength(3)
     expect(sent[0].headers).toEqual({ 'X-Device-Id': 'till-1' })

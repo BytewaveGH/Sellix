@@ -4,7 +4,7 @@ import type { ExtendedUser } from './types/next-auth'
 import { SignInFormSchema } from './types/schemas/schema'
 import { IAuth } from './types/interfaces'
 import { classifyHost } from './lib/tenant'
-import { refreshOutcome } from './lib/network'
+import { EMPLOYEE_REFRESH_LEAD_S, refreshOutcome } from './lib/network'
 import { lookupTenantAppType, normalizeAppType } from './lib/app-type'
 import { LOGIN_CODES, encodeBusinessChoice, type OwnerBusiness } from './lib/owner-login'
 import * as z from 'zod'
@@ -363,7 +363,9 @@ export default {
       // Super admin has no real backend session to refresh — never attempt it.
       if (token.accountType === 'super-admin') return token
 
-      const shouldRefreshTime = (token.accessTokenExpiry as number) - 5 * 60 - Math.floor(Date.now() / 1000)
+      // Cashiers: hours ahead (refresh-token-handler asks then); owners: 5 minutes.
+      const lead = token.accountType === 'employee' ? EMPLOYEE_REFRESH_LEAD_S + 5 * 60 : 5 * 60
+      const shouldRefreshTime = (token.accessTokenExpiry as number) - lead - Math.floor(Date.now() / 1000)
       if (shouldRefreshTime > 0) return token
 
       return refreshAccessToken(token)

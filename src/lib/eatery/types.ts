@@ -225,6 +225,8 @@ export interface Order {
   syncedAt?: string
   stockShort?: boolean
   priceMismatch?: boolean
+  // Rung up on this till and not on the server yet ('syncing'), or refused by it.
+  syncState?: 'syncing' | 'needs-attention'
 }
 
 export type OrderChannel = 'online' | 'counter'

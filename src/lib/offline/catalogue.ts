@@ -104,7 +104,9 @@ const MENU: { key: string; path: string }[] = [
   { key: 'promotions', path: '/eatery/promotions' },
 ]
 
-export const syncEateryMenu = async (scope: string, get: Get) => {
+// Resolves to how many rows changed or went (0: nothing to reload).
+export const syncEateryMenu = async (scope: string, get: Get): Promise<number> => {
+  let changes = 0
   const run = async (since?: string) => {
     const page = await get('/eatery/sync/changes', since ? { since } : {})
     const deleted = page?.deleted ?? {}
@@ -113,6 +115,7 @@ export const syncEateryMenu = async (scope: string, get: Get) => {
     for (const { key, path } of MENU) {
       const changed = rows(page?.[key])
       const gone = ids(deleted[key])
+      changes += changed.length + gone.size + (key === 'restaurants' ? goneRestaurants.size : 0)
       if (!since) await seed(scope, { url: `${path}/` }, changed)
       await mergeIntoReads(
         scope,
@@ -131,4 +134,5 @@ export const syncEateryMenu = async (scope: string, get: Get) => {
     await setKept(scope, 'eatery-cursor', undefined)
     await run()
   }
+  return changes
 }

@@ -49,8 +49,10 @@ const isRealEstateUrl = (url?: string) => /(^|\/)real-estate\//.test(url ?? '')
 // on a slow connection doubled the wait for everything. Otherwise (no session
 // yet, token about to expire) ask next-auth, which refreshes it.
 const TOKEN_MARGIN_S = 120
-const currentSession = async (): Promise<Session | null> => {
+// `quick`: a write kept on the device first only needs to know whose it is.
+const currentSession = async (quick = false): Promise<Session | null> => {
   const known = getSessionSync()
+  if (quick && known?.user) return known
   const expiry = Number(known?.user?.accessTokenExpiry) || 0
   if (known?.user?.accessToken && expiry - Date.now() / 1000 > TOKEN_MARGIN_S) return known
   // Offline with the token-free copy kept on the device: nothing to ask.
@@ -66,7 +68,8 @@ const rememberToken = (accessToken: string, session?: Session | null) => {
 
 apiClient.interceptors.request.use(async (config) => {
   ;(config as { _startedAt?: number })._startedAt = Date.now()
-  const session = await currentSession()
+  const offline = (config as OfflineConfig).offline
+  const session = await currentSession(!!offline && !!offline.localFirst)
   ;(config as OfflineConfig)._scope = sessionScope(session?.user)
   if (session?.user?.accessToken) {
     // A retry after a refresh already carries the new token; the session may still hold the old one.

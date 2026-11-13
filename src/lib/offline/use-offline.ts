@@ -12,11 +12,36 @@ import { apiClient, sendQueued, sessionScope } from '../axios-client'
 import { apiStatus } from '../api-error'
 import { syncEateryMenu, syncRetailCatalogue, type Get } from './catalogue'
 import type { OfflineConfig } from './adapter'
-import { useConnection } from '../connection'
-import { discardOp, isSyncing, listOps, retryOp, subscribeOutbox, syncOutbox, type Op } from './engine'
+import { getConnection, useConnection } from '../connection'
+import { discardOp, isSyncing, listOps, retryOp, subscribeOutbox, subscribeSynced, syncOutbox, type Op, type SyncResult } from './engine'
+import type { Query, QueryClient } from '@tanstack/react-query'
 
-const RESYNC_MS = 30_000
+// The API lists a query holds (`meta.paths`), if it says.
+const queryPaths = (q: Query) => ((q.meta as { paths?: unknown } | undefined)?.paths as string[] | undefined) ?? []
+
+// After a sync: show rows that were made on this device under their real ids
+// at once, then reload only the lists the sent changes belong to (all of them
+// when no screen says which lists it holds).
+const showSynced = (qc: QueryClient, result: SyncResult) => {
+  if (!result.sent) return
+  const touched = (q: Query) => queryPaths(q).some((p) => result.paths.includes(p))
+  const queries = qc.getQueryCache().findAll({ predicate: touched })
+  for (const { path, row } of result.made) {
+    for (const q of queries) {
+      if (!queryPaths(q).includes(path)) continue
+      qc.setQueryData(q.queryKey, (old: unknown) =>
+        Array.isArray(old) && !old.some((x) => x?.id === row.id) ? [row, ...old] : old
+      )
+    }
+  }
+  void (queries.length ? qc.invalidateQueries({ predicate: touched }) : qc.invalidateQueries())
+}
+
+// While changes wait: try every 15 s, backing off to a minute after failures.
+const RESYNC_MS = 15_000
+const RESYNC_MAX_MS = 60_000
 const CATALOGUE_MS = 5 * 60_000
+const MENU_PATHS = ['/eatery/restaurants', '/eatery/menu-categories', '/eatery/menu-items', '/eatery/promotions']
 
 // Straight to the server: never answered from, or kept in, the device's copies.
 const getChanges: Get = async (url, params) =>
@@ -26,12 +51,14 @@ const getChanges: Get = async (url, params) =>
 const noChangesEndpoint = new Set<string>()
 
 let catalogueRunning = false
-const syncCatalogue = async (scope: string, appType?: string) => {
+const syncCatalogue = async (scope: string, appType?: string, onMenuChanged?: () => void) => {
   const which = appType === 'retail' ? 'retail' : appType === 'eatery' ? 'eatery' : null
   if (!which || noChangesEndpoint.has(which) || catalogueRunning) return
   catalogueRunning = true
   try {
-    await (which === 'retail' ? syncRetailCatalogue(scope, getChanges) : syncEateryMenu(scope, getChanges))
+    if (which === 'retail') await syncRetailCatalogue(scope, getChanges)
+    // Screens read the menu from this device: show what changed.
+    else if ((await syncEateryMenu(scope, getChanges)) > 0) onMenuChanged?.()
   } catch (err) {
     if (apiStatus(err) === 404 || apiStatus(err) === 405) noChangesEndpoint.add(which)
     // Otherwise (offline, slow): tried again next time.
@@ -105,8 +132,14 @@ export const useOffline = (): OfflineState => {
   const reload = useCallback(async () => {
     if (!scope) return setOps([])
     const next = await listOps(scope)
-    // Something new was kept offline: say so (not for every change).
-    if (known.current && next.some((o) => !known.current!.has(o.id)) && Date.now() - lastQueuedToast.current > 60_000) {
+    // Something new was kept offline: say so (not for every change, and not
+    // for a till's orders made online, which are kept first by design).
+    if (
+      getConnection().status === 'offline' &&
+      known.current &&
+      next.some((o) => !known.current!.has(o.id)) &&
+      Date.now() - lastQueuedToast.current > 60_000
+    ) {
       lastQueuedToast.current = Date.now()
       toast.message('Saved on this device', { description: 'You’re offline. Your changes will be sent when the connection is back.' })
     }
@@ -120,43 +153,77 @@ export const useOffline = (): OfflineState => {
     return subscribeOutbox(() => void reload())
   }, [reload])
 
+  // Whatever started a sync: update the screens and say what happened.
+  const wasOffline = useRef(false)
+  const delay = useRef(RESYNC_MS)
+  useEffect(() => {
+    if (status === 'offline') wasOffline.current = true
+  }, [status])
+  useEffect(
+    () =>
+      subscribeSynced((s, result) => {
+        if (s !== scope) return
+        showSynced(qc, result)
+        // Gone well: back to the quick timer. Stopped (no answer, 429, 5xx): back off.
+        delay.current = result.stopped ? Math.min(delay.current * 2, RESYNC_MAX_MS) : RESYNC_MS
+        // Only worth a word after an offline spell; online it happens all the time.
+        if (result.sent > 0 && wasOffline.current) {
+          wasOffline.current = false
+          toast.success(result.sent === 1 ? 'Your offline change was sent' : `${result.sent} offline changes were sent`)
+        }
+        if (result.failed > 0) {
+          toast.error(result.failed === 1 ? 'One change was refused' : `${result.failed} changes were refused`, {
+            description: 'Open the sync list at the top of the screen to see why.',
+          })
+        }
+      }),
+    [scope, qc]
+  )
+
   const sync = useCallback(async () => {
-    if (!scope || isSyncing(scope)) return
+    if (!scope) return
     const before = await listOps(scope)
     if (!before.some((o) => o.status === 'waiting')) return
-    const result = await syncOutbox(scope, sendQueued)
-    if (result.sent > 0) {
-      // Replace what was shown early with the server's own data.
-      await qc.invalidateQueries()
-      toast.success(result.sent === 1 ? 'Your offline change was sent' : `${result.sent} offline changes were sent`)
-    }
-    if (result.failed > 0) {
-      toast.error(result.failed === 1 ? 'One offline change was refused' : `${result.failed} offline changes were refused`, {
-        description: 'Open the sync list at the top of the screen to see why.',
-      })
-    }
-  }, [scope, qc])
+    await syncOutbox(scope, sendQueued)
+  }, [scope])
 
   // Back online (or signed in with changes waiting): send them.
   useEffect(() => {
     if (status !== 'offline') void sync()
   }, [status, sync])
 
+  // The browser's own "online" event too: it can come before our check notices.
   useEffect(() => {
-    if (status === 'offline' || !ops.some((o) => o.status === 'waiting')) return
-    const t = setInterval(() => void sync(), RESYNC_MS)
-    return () => clearInterval(t)
-  }, [status, ops, sync])
+    const onOnline = () => void sync()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [sync])
+
+  // While changes wait: every 15 s, backing off to a minute after failures.
+  const hasWaiting = ops.some((o) => o.status === 'waiting')
+  useEffect(() => {
+    if (status === 'offline' || !hasWaiting) return
+    let t: ReturnType<typeof setTimeout>
+    const tick = () => {
+      t = setTimeout(async () => {
+        await sync()
+        tick()
+      }, delay.current)
+    }
+    tick()
+    return () => clearTimeout(t)
+  }, [status, hasWaiting, sync])
 
   // Keep what the till sells from up to date on this PC (§13.3).
   const appType = (session?.user as { appType?: string } | undefined)?.appType
   const isOffline = status === 'offline'
   useEffect(() => {
     if (isOffline || !scope) return
-    void syncCatalogue(scope, appType)
-    const t = setInterval(() => void syncCatalogue(scope, appType), CATALOGUE_MS)
+    const menuChanged = () => void qc.invalidateQueries({ predicate: (q) => queryPaths(q).some((p) => MENU_PATHS.includes(p)) })
+    void syncCatalogue(scope, appType, menuChanged)
+    const t = setInterval(() => void syncCatalogue(scope, appType, menuChanged), CATALOGUE_MS)
     return () => clearInterval(t)
-  }, [isOffline, scope, appType])
+  }, [isOffline, scope, appType, qc])
 
   // Keep the screens for offline use, once things have settled.
   useEffect(() => {

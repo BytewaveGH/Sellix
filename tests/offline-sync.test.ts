@@ -139,7 +139,7 @@ describe('working offline through the API client', () => {
     setOnline(true)
     sent = []
     const result = await syncOutbox(SCOPE, send)
-    expect(result).toEqual({ sent: 3, failed: 0, stopped: false })
+    expect(result).toMatchObject({ sent: 3, failed: 0, stopped: false, paths: ['/eatery/orders'] })
     expect(sent).toEqual(['POST /eatery/orders/counter', 'PUT /eatery/orders/2', 'PUT /eatery/orders/1'])
     expect(server.orders).toEqual([
       { id: 1, status: 'completed' },

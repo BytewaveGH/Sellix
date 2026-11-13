@@ -37,5 +37,10 @@ export const refreshOutcome = (status: number | null, account: 'owner' | 'employ
   return GATEWAY_DOWN.has(status) ? 'unreachable' : 'rejected'
 }
 
+// Cashier tokens (24 h) are refreshed this long before they expire, in the
+// background, so a till never meets an expired token mid-sale — and a refresh
+// that fails on a bad connection has hours to try again.
+export const EMPLOYEE_REFRESH_LEAD_S = 3 * 3600
+
 // Requests slower than this make the connection count as slow.
 export const SLOW_MS = 4000

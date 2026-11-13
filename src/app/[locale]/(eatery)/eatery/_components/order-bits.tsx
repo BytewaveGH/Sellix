@@ -8,6 +8,20 @@ import { Badge, type BadgeSpec } from '@/components/kit/ui'
 import { clockLabel, formatMoney } from '@/lib/eatery/menu'
 import type { Order, OrderStatus } from '@/lib/eatery/types'
 
+// An order rung up on this till that the server doesn't have yet.
+export const SyncPill = ({ order }: { order: Pick<Order, 'syncState'> }) =>
+  order.syncState ? (
+    <span
+      className={cn(
+        'ml-1.5 inline-flex rounded-full px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide',
+        order.syncState === 'syncing' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-800'
+      )}
+      title={order.syncState === 'syncing' ? 'Saved on this till, on its way to the server' : 'The server refused it — see the sync list at the top'}
+    >
+      {order.syncState === 'syncing' ? 'Syncing' : 'Needs attention'}
+    </span>
+  ) : null
+
 export const STATUS: Record<OrderStatus, BadgeSpec> = {
   placed: { label: 'New', icon: Clock, className: 'bg-rose-50 text-rose-700 ring-rose-600/15', dot: '#E11D48' },
   accepted: { label: 'Accepted', icon: CheckCircle2, className: 'bg-endeavour/10 text-endeavour ring-endeavour/15', dot: '#0865AC' },
@@ -120,7 +134,10 @@ export const OrderCard = ({
     >
       <header className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-lg font-extrabold tracking-wider text-stone-900">#{order.code}</p>
+          <p className="text-lg font-extrabold tracking-wider text-stone-900">
+            #{order.code}
+            <SyncPill order={order} />
+          </p>
           <p className="text-xs text-stone-500">
             {order.customer.name} · {ago(order.createdAt, now)}
           </p>

@@ -8,7 +8,7 @@
 import { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { getConnection, reportReachable, reportUnreachable } from '../connection'
 import { isUnreachableError, SLOW_MS } from '../network'
-import { cachedRead, listOps, queueWrite, saveRead, settleKept, syncOutbox, type OfflineOptions, type Send } from './engine'
+import { cachedRead, listOps, queueWrite, saveRead, settleKept, showWritten, syncOutbox, type OfflineOptions, type Send } from './engine'
 import { cannotQueue, methodOf, tempIdsIn } from './rules'
 
 export type OfflineConfig = {
@@ -57,6 +57,11 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
     const options = c.offline || undefined
 
     if (methodOf(c) === 'GET') {
+      // Kept current another way: never wait for the network when there's a copy.
+      if (options?.cacheFirst) {
+        const hit = await cachedRead(scope, c)
+        if (hit) return answer(config, hit.body, 'cached', hit.at)
+      }
       // Known to be offline: answer from the device at once, no waiting for a timeout.
       if (knownOffline()) {
         const hit = await cachedRead(scope, c)
@@ -90,6 +95,15 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
     const queue = async () => {
       const { body } = await queueWrite(scope, c, options)
       return answer(config, body, 'queued')
+    }
+
+    // Local-first (a till's counter order): kept on the device and answered at
+    // once, online or not; sent in the background. The till never waits for
+    // the network — a slow connection doesn't fail, it hangs.
+    if (options?.localFirst && !reason) {
+      const res = await queue()
+      void syncOutbox(scope, send).catch(() => undefined)
+      return res
     }
 
     if (knownOffline()) {
@@ -130,12 +144,17 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
         )
         return answer(config, body, 'queued')
       }
-      if ('res' in first) return first.res
+      if ('res' in first) {
+        await showWritten(scope, c, first.res.data, options?.appendTo)
+        return first.res
+      }
       if (isUnreachableError(first.err)) return queue()
       throw first.err
     }
     try {
-      return await live
+      const res = await live
+      await showWritten(scope, c, res.data, options?.appendTo)
+      return res
     } catch (err) {
       // The browser knew it had no network, so the request never left: safe to keep.
       if (!reason && isUnreachableError(err) && (browserOffline() || repeatable)) return queue()

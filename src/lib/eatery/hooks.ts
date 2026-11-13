@@ -7,11 +7,13 @@ import { toast } from 'sonner'
 import { useAxios } from '@/hooks/use-axios'
 import { publicApiClient } from '@/lib/public-axios-client'
 import { apiErrorMessage, apiStatus } from '@/lib/api-error'
-import { createApiSource, createLocalSource, DATA_SOURCE_KIND, type EaterySource, type OrderTicket } from './data-source'
+import { createApiSource, createLocalSource, DATA_SOURCE_KIND, EateryServices, type EaterySource, type OrderTicket } from './data-source'
 import { prepareImage, type ImageKind } from './images'
 import { itemNames, offlineCounterOrder, offlineOrderBody } from './offline-order'
 import { newClientId, nextReceiptNo, tillFields } from '../till'
 import { getConnection } from '../connection'
+import { usePendingRows } from '../offline/use-pending'
+import { pathOf } from '../offline/rules'
 import { dressForFestival } from './festivals'
 import type { CounterOrderInput, DirectoryEntry, ResourceMap, ResourceName, Restaurant, StorefrontBundle } from './types'
 
@@ -177,6 +179,8 @@ export const useOwnerData = (): OwnerData => {
     queries: OWNER_RESOURCES.map((r) => ({
       queryKey: ['eatery', source.kind, 'owner', scope, r],
       queryFn: () => source.list(r),
+      // The list it holds, so a sync reloads only what it changed.
+      meta: { paths: [pathOf(EateryServices.List(r))] },
       enabled: ready,
       staleTime: 15_000,
       // New orders arrive on their own.
@@ -184,6 +188,8 @@ export const useOwnerData = (): OwnerData => {
       ...QUERY_DEFAULTS,
     })),
   })
+  // Counter orders on this till the server doesn't have yet.
+  const pending = usePendingRows('/eatery/orders', source.kind === 'api') as unknown as ResourceMap['orders'][]
   const select = useCallback((id: number) => {
     setSelected(id)
     try {
@@ -196,6 +202,10 @@ export const useOwnerData = (): OwnerData => {
   return useMemo(() => {
     const data = Object.fromEntries(OWNER_RESOURCES.map((r, i) => [r, (results[i].data as unknown[]) ?? []])) as {
       [R in ResourceName]: ResourceMap[R][]
+    }
+    if (pending.length) {
+      const have = new Set(data.orders.map((o) => o.id))
+      data.orders = [...pending.filter((o) => !have.has(o.id)), ...data.orders]
     }
     const failed = results.find((r) => r.error)
     const restaurant = data.restaurants.find((r) => r.id === selected) ?? data.restaurants[0] ?? null
@@ -218,7 +228,7 @@ export const useOwnerData = (): OwnerData => {
       select,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, selected, select, ...results.map((r) => r.data), ...results.map((r) => r.error)])
+  }, [ready, selected, select, pending, ...results.map((r) => r.data), ...results.map((r) => r.error)])
 }
 
 // Writes. 400/409/422 go to `error` for the open form to show; others toast.
@@ -241,14 +251,15 @@ export const useEateryActions = () => {
     }
   }
 
-  // `wait`: hold the caller until the lists have reloaded. Offline it never
-  // waits (the lists come from the device), and a counter order never does:
-  // the till moves on at once and the kitchen board catches up.
-  const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false, wait = true): Promise<T> => {
+  // `reload`: 'wait' holds the caller until the lists have reloaded (never
+  // offline: they come from the device); 'none' for a counter order, which
+  // the screens show straight from the outbox — nothing to reload.
+  const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false, reload: 'wait' | 'none' = 'wait'): Promise<T> => {
     setError(null)
     try {
       const out = await fn()
-      if (wait && getConnection().status !== 'offline') await refresh()
+      if (reload === 'none' && source.kind === 'api') return out
+      if (getConnection().status !== 'offline') await refresh()
       else void refresh()
       return out
     } catch (err) {
@@ -277,7 +288,9 @@ export const useEateryActions = () => {
       // One id and receipt number for this order, however it reaches the server.
       const now = new Date()
       const order: CounterOrderInput = source.kind === 'api' ? { ...input, clientId: newClientId(), ...tillFields(nextReceiptNo(), now) } : input
-      return run(() => source.createCounterOrder(restaurantId, order, offlinePreview(restaurantId, order, now)), 'Couldn’t send the order.', false, false)
+      const local = offlinePreview(restaurantId, order, now)
+      // With a local record the till is done at once; without (menu not loaded) it's a live order.
+      return run(() => source.createCounterOrder(restaurantId, order, local), 'Couldn’t send the order.', false, local ? 'none' : 'wait')
     },
     claimDemo: () => run(() => (source.claimDemo ? source.claimDemo() : Promise.resolve([])), 'Couldn’t add the examples.'),
     // Sequential, for building a menu from a preset.
