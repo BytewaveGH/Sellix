@@ -4,7 +4,6 @@
 // prices it again and gives it its own number then.
 
 import { priceOrder } from './menu'
-import { newClientId, tillFields } from '../till'
 import type { CounterOrderInput, MenuCategory, MenuItem, Order, Promotion, Restaurant } from './types'
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -67,15 +66,14 @@ export const offlineCounterOrder = (
   }
 }
 
-// What's sent for a counter order kept offline: the till's identity and, per
-// line, the price the customer paid (after promotions), which the server keeps.
-export const offlineOrderBody = (menu: MenuOnDevice, input: CounterOrderInput, receiptNo: string, now: Date) => {
+// What's sent for a counter order kept offline: the order as rung up (with
+// its clientId and till fields) plus, per line, the price the customer paid
+// (after promotions), which the server keeps.
+export const offlineOrderBody = (menu: MenuOnDevice, input: CounterOrderInput, now: Date) => {
   const b = bundle(menu)
   return {
     ...input,
     restaurantId: menu.restaurant.id,
-    clientId: newClientId(),
-    ...tillFields(receiptNo, now),
     lines: input.lines.map((l) => {
       const price = priceOrder(b, [l], null, now).lines[0]?.unitPrice
       return price === undefined ? l : { ...l, unitPrice: price }

@@ -7,15 +7,20 @@ import { toast } from 'sonner'
 import { useAxios } from '@/hooks/use-axios'
 import { publicApiClient } from '@/lib/public-axios-client'
 import { apiErrorMessage, apiStatus } from '@/lib/api-error'
-import { createApiSource, createLocalSource, DATA_SOURCE_KIND, type EaterySource, type OrderTicket } from './data-source'
+import { createApiSource, createLocalSource, DATA_SOURCE_KIND, EateryServices, type EaterySource, type OrderTicket } from './data-source'
 import { prepareImage, type ImageKind } from './images'
 import { itemNames, offlineCounterOrder, offlineOrderBody } from './offline-order'
-import { nextReceiptNo } from '../till'
+import { newClientId, nextReceiptNo, tillFields } from '../till'
+import { getConnection } from '../connection'
+import { usePendingRows } from '../offline/use-pending'
+import { pathOf } from '../offline/rules'
 import { dressForFestival } from './festivals'
 import type { CounterOrderInput, DirectoryEntry, ResourceMap, ResourceName, Restaurant, StorefrontBundle } from './types'
 
 // Network errors and 5xx only, at most twice; a failed query waits for the user.
-const retry = (count: number, err: unknown) => count < 2 && (apiStatus(err) === undefined || (apiStatus(err) ?? 0) >= 500)
+// Offline, never: nothing will answer, and each retry only adds a pause.
+const retry = (count: number, err: unknown) =>
+  count < 2 && getConnection().status !== 'offline' && (apiStatus(err) === undefined || (apiStatus(err) ?? 0) >= 500)
 const notFailed = (q: { state: { status: string } }) => q.state.status !== 'error'
 const QUERY_DEFAULTS = {
   retry,
@@ -174,6 +179,8 @@ export const useOwnerData = (): OwnerData => {
     queries: OWNER_RESOURCES.map((r) => ({
       queryKey: ['eatery', source.kind, 'owner', scope, r],
       queryFn: () => source.list(r),
+      // The list it holds, so a sync reloads only what it changed.
+      meta: { paths: [pathOf(EateryServices.List(r))] },
       enabled: ready,
       staleTime: 15_000,
       // New orders arrive on their own.
@@ -181,6 +188,8 @@ export const useOwnerData = (): OwnerData => {
       ...QUERY_DEFAULTS,
     })),
   })
+  // Counter orders on this till the server doesn't have yet.
+  const pending = usePendingRows('/eatery/orders', source.kind === 'api') as unknown as ResourceMap['orders'][]
   const select = useCallback((id: number) => {
     setSelected(id)
     try {
@@ -193,6 +202,10 @@ export const useOwnerData = (): OwnerData => {
   return useMemo(() => {
     const data = Object.fromEntries(OWNER_RESOURCES.map((r, i) => [r, (results[i].data as unknown[]) ?? []])) as {
       [R in ResourceName]: ResourceMap[R][]
+    }
+    if (pending.length) {
+      const have = new Set(data.orders.map((o) => o.id))
+      data.orders = [...pending.filter((o) => !have.has(o.id)), ...data.orders]
     }
     const failed = results.find((r) => r.error)
     const restaurant = data.restaurants.find((r) => r.id === selected) ?? data.restaurants[0] ?? null
@@ -215,7 +228,7 @@ export const useOwnerData = (): OwnerData => {
       select,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, selected, select, ...results.map((r) => r.data), ...results.map((r) => r.error)])
+  }, [ready, selected, select, pending, ...results.map((r) => r.data), ...results.map((r) => r.error)])
 }
 
 // Writes. 400/409/422 go to `error` for the open form to show; others toast.
@@ -226,26 +239,28 @@ export const useEateryActions = () => {
   const refresh = () => qc.invalidateQueries({ queryKey: ['eatery', source.kind] })
   // The menu already on this device, to price a counter order made offline.
   const loaded = <R extends ResourceName>(r: R) => (qc.getQueryData(['eatery', source.kind, 'owner', scope, r]) as ResourceMap[R][] | undefined) ?? []
-  const offlinePreview = (restaurantId: number, input: CounterOrderInput) => {
+  // `input` already carries the till's clientId, receipt number and time.
+  const offlinePreview = (restaurantId: number, input: CounterOrderInput, now: Date) => {
     const restaurant = loaded('restaurants').find((r) => r.id === restaurantId)
     if (!restaurant) return undefined
     const menu = { restaurant, categories: loaded('categories'), items: loaded('items'), promotions: loaded('promotions') }
-    const now = new Date()
-    // Only used if the order has to wait offline; a live order is numbered by the server.
-    let receiptNo: string | undefined
-    const number = () => (receiptNo ??= nextReceiptNo())
     return {
-      result: (tempId: number) => offlineCounterOrder(menu, input, tempId, now, number()),
-      body: () => offlineOrderBody(menu, input, number(), now),
+      result: (tempId: number) => offlineCounterOrder(menu, input, tempId, now, input.receiptNo),
+      body: () => offlineOrderBody(menu, input, now),
       names: itemNames(menu, input),
     }
   }
 
-  const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false): Promise<T> => {
+  // `reload`: 'wait' holds the caller until the lists have reloaded (never
+  // offline: they come from the device); 'none' for a counter order, which
+  // the screens show straight from the outbox — nothing to reload.
+  const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false, reload: 'wait' | 'none' = 'wait'): Promise<T> => {
     setError(null)
     try {
       const out = await fn()
-      await refresh()
+      if (reload === 'none' && source.kind === 'api') return out
+      if (getConnection().status !== 'offline') await refresh()
+      else void refresh()
       return out
     } catch (err) {
       const message = apiErrorMessage(err, fail)
@@ -269,8 +284,14 @@ export const useEateryActions = () => {
     uploadImage: (restaurantId: number, file: File, kind: ImageKind) =>
       run(async () => source.uploadImage(restaurantId, await prepareImage(file, kind), kind), 'Couldn’t upload the image.', true),
     // Counter (POS) order: priced by the source, accepted at once.
-    createCounterOrder: (restaurantId: number, input: CounterOrderInput) =>
-      run(() => source.createCounterOrder(restaurantId, input, offlinePreview(restaurantId, input)), 'Couldn’t send the order.'),
+    createCounterOrder: (restaurantId: number, input: CounterOrderInput) => {
+      // One id and receipt number for this order, however it reaches the server.
+      const now = new Date()
+      const order: CounterOrderInput = source.kind === 'api' ? { ...input, clientId: newClientId(), ...tillFields(nextReceiptNo(), now) } : input
+      const local = offlinePreview(restaurantId, order, now)
+      // With a local record the till is done at once; without (menu not loaded) it's a live order.
+      return run(() => source.createCounterOrder(restaurantId, order, local), 'Couldn’t send the order.', false, local ? 'none' : 'wait')
+    },
     claimDemo: () => run(() => (source.claimDemo ? source.claimDemo() : Promise.resolve([])), 'Couldn’t add the examples.'),
     // Sequential, for building a menu from a preset.
     createMany: <R extends ResourceName>(r: R, bodies: Omit<ResourceMap[R], 'id'>[]) =>

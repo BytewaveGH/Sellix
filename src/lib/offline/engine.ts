@@ -15,6 +15,8 @@ import { offlineStore } from './store'
 import {
   applyToList,
   BATCH_SIZE,
+  isTempId,
+  pathOf,
   batchFor,
   batchResults,
   describeWrite,
@@ -56,6 +58,10 @@ export type Op = {
   code?: string
   // Names saved on the till, by id, for the server's refusal messages.
   names?: Record<string, string>
+  // Local-first: the row as shown until the server has it, and the list it
+  // belongs to. Screens add these to what they load (pendingRows).
+  preview?: Record<string, unknown>
+  showIn?: string
 }
 
 // What a caller can say about a write (on the axios config as `offline`).
@@ -73,6 +79,22 @@ export type OfflineOptions = {
   names?: Record<string, string>
   // Further changes to cached answers (e.g. stock going down after a sale).
   adjust?: (key: string, body: unknown) => unknown | undefined
+  // Which kept answers `adjust` looks at (by key), so the rest aren't read.
+  adjusts?: (key: string) => boolean
+  // On a slow connection: if the server hasn't answered in this many ms, keep
+  // the change and answer at once; the request carries on and, if it lands,
+  // the kept copy is dropped. Only for writes the server recognises when they
+  // come twice (a clientId).
+  waitMs?: number
+  // Always kept on the device first and sent in the background, online or
+  // not: the caller never waits for the network (a till's counter order).
+  // The row is kept on the change itself — one write — and screens show it
+  // from there (pendingRows), not from the kept lists.
+  localFirst?: boolean
+  // Reads: answer from the device whenever it has a copy, with no network
+  // call. For data kept current another way (the menu: §13.3 changes, and
+  // this device's own writes via showWritten).
+  cacheFirst?: boolean
 }
 
 type Cached = { body: unknown; at: string }
@@ -107,11 +129,17 @@ export const cachedRead = async (scope: string, req: RequestLike): Promise<Cache
 }
 
 // Rewrite every cached answer in the scope that `fn` changes.
-const patchReads = async (scope: string, fn: (key: string, body: unknown) => unknown | undefined) => {
+// `match` picks the answers by key first, so only those are read from disk
+// (the kept product catalogue alone can be megabytes).
+const patchReads = async (scope: string, fn: (key: string, body: unknown) => unknown | undefined, match: (key: string) => boolean = () => true) => {
   const store = offlineStore()
   const prefix = readPrefix(scope)
-  for (const [k, v] of await store.entries<Cached>(prefix)) {
-    const next = fn(k.slice(prefix.length), v.body)
+  for (const k of await store.keys(prefix)) {
+    const key = k.slice(prefix.length)
+    if (!match(key)) continue
+    const v = await store.get<Cached>(k)
+    if (!v) continue
+    const next = fn(key, v.body)
     if (next !== undefined && next !== v.body) await store.set(k, { ...v, body: next })
   }
 }
@@ -131,7 +159,27 @@ const showInReads = async (scope: string, req: RequestLike, change: Change, coll
       return body && typeof body === 'object' && 'data' in (body as object) ? { ...(body as object), data: merged } : merged
     }
     return undefined
-  })
+  }, (key) => listsCollection(key, collection) || key === one)
+}
+
+// A write the server accepted (online): lay its answer into the kept lists
+// too, so a cache-first read never shows them stale.
+export const showWritten = async (scope: string, req: RequestLike, answer: unknown, appendTo?: string) => {
+  try {
+    const shape = writeShape(req)
+    const row = rowIn(parsed(answer))
+    if (shape.kind === 'create') {
+      if (row && row.id !== undefined && row.id !== null) await showInReads(scope, req, { kind: 'create', row }, appendTo ?? shape.collection)
+    } else if (shape.kind === 'update') {
+      const sent = (parsed(req.data) ?? {}) as Record<string, unknown>
+      const patch = row && Number(row.id) === shape.id ? row : sent
+      await showInReads(scope, req, { kind: 'update', id: shape.id, patch }, shape.collection)
+    } else if (shape.kind === 'delete') {
+      await showInReads(scope, req, { kind: 'delete', id: shape.id }, shape.collection)
+    }
+  } catch {
+    // Only the kept copy is behind; the next full load fixes it.
+  }
 }
 
 // ── The outbox ───────────────────────────────────────────────────────────────
@@ -162,6 +210,20 @@ export const queueWrite = async (scope: string, req: RequestLike & { timeout?: n
   const shape = writeShape(req)
   const body = (req.data && typeof req.data === 'object' ? req.data : {}) as Record<string, unknown>
   const tempId = shape.kind === 'create' ? newTempId() : undefined
+
+  // A change to a row that so far exists only as a local-first change: update
+  // the row it shows (a deleted one goes, with everything waiting on it).
+  if ((shape.kind === 'update' || shape.kind === 'delete') && isTempId(shape.id)) {
+    const maker = (await listOps(scope)).find((o) => o.tempId === shape.id && o.preview)
+    if (maker && shape.kind === 'delete') {
+      await discardOp(scope, maker.id)
+      return { op: maker, body: { status: true, data: null } }
+    }
+    if (maker && shape.kind === 'update') await saveOp({ ...maker, preview: { ...maker.preview, ...body, id: shape.id } })
+  }
+
+  const preview =
+    opts.localFirst && shape.kind === 'create' ? { ...body, ...(opts.result?.(tempId!) ?? {}), id: tempId as number } : undefined
   const op: Op = {
     id: opId(),
     scope,
@@ -176,8 +238,16 @@ export const queueWrite = async (scope: string, req: RequestLike & { timeout?: n
     safeToRepeat: opts.safeToRepeat ?? methodOf(req) !== 'POST',
     status: 'waiting',
     names: opts.names,
+    ...(preview ? { preview } : {}),
+    // The list it belongs to, when that isn't where it's posted (a counter order: the orders list).
+    ...(preview || opts.appendTo ? { showIn: opts.appendTo ?? (shape.kind === 'create' ? shape.collection : undefined) } : {}),
   }
   await saveOp(op)
+  if (preview) {
+    // One write: the screens read it from the outbox.
+    emit()
+    return { op, body: { status: true, data: preview } }
+  }
 
   let row: Record<string, unknown> = body
   try {
@@ -190,7 +260,7 @@ export const queueWrite = async (scope: string, req: RequestLike & { timeout?: n
     } else if (shape.kind === 'delete') {
       await showInReads(scope, req, { kind: 'delete', id: shape.id }, shape.collection)
     }
-    if (opts.adjust) await patchReads(scope, opts.adjust)
+    if (opts.adjust) await patchReads(scope, opts.adjust, opts.adjusts)
   } catch {
     // The change is safe in the outbox; only the early preview failed.
   }
@@ -225,9 +295,28 @@ export const retryOp = async (scope: string, id: string) => {
 
 export type SendRequest = Pick<Op, 'method' | 'url' | 'params' | 'data' | 'timeout'> & { headers?: Record<string, string> }
 export type Send = (req: SendRequest) => Promise<{ data: unknown }>
-export type SyncResult = { sent: number; failed: number; stopped: boolean }
+// `paths`: the lists the sent changes belong to, so only those are reloaded.
+// `made`: rows that were shown from the outbox, now with the server's id, so a
+// screen can keep showing them while its list reloads.
+export type SyncResult = { sent: number; failed: number; stopped: boolean; paths: string[]; made: { path: string; row: Record<string, unknown> }[] }
 
 const syncing = new Map<string, Promise<SyncResult>>()
+// Every finished sync, wherever it was started (a charge, a timer, reconnecting).
+const syncedListeners = new Set<(scope: string, result: SyncResult) => void>()
+export const subscribeSynced = (l: (scope: string, result: SyncResult) => void) => {
+  syncedListeners.add(l)
+  return () => void syncedListeners.delete(l)
+}
+// Asked to sync while a sync was running: run once more when it ends, so a
+// change made meanwhile isn't left for the next timer.
+const again = new Set<string>()
+
+// The list a change belongs to.
+const pathFor = (op: Op) => {
+  if (op.showIn) return op.showIn
+  const shape = writeShape(op)
+  return shape.kind === 'action' ? pathOf(op) : shape.collection
+}
 export const isSyncing = (scope: string) => syncing.has(scope)
 
 const browserOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
@@ -257,10 +346,15 @@ const noBatchEndpoint = new Set<string>()
 // Till sales and counter orders in a row go up together (§13.2).
 export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
   const running = syncing.get(scope)
-  if (running) return running
+  if (running) {
+    again.add(scope)
+    return running
+  }
   const run = (async (): Promise<SyncResult> => {
     let sent = 0
     let failed = 0
+    const paths = new Set<string>()
+    const made: SyncResult['made'] = []
     let ops = await listOps(scope)
     // Sent in a batch this round: not again until the next round.
     const tried = new Set<string>()
@@ -286,7 +380,8 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
             method: 'POST',
             url: batch.url,
             data: { [batch.key]: group.map((o) => o.data) },
-            timeout: 60_000,
+            // Nobody is waiting on it.
+            timeout: 20_000,
             headers: { 'X-Device-Id': String((op.data as { deviceId?: unknown })?.deviceId ?? '') },
           })
         } catch (err) {
@@ -301,7 +396,7 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
           // goes again later — what was recorded comes back as a duplicate.
           if (isUnreachableError(err) || status === 429 || (status ?? 0) >= 500) {
             emit()
-            return { sent, failed, stopped: true }
+            return { sent, failed, stopped: true, paths: Array.from(paths), made }
           }
           // The batch as a whole was refused (e.g. invalid_payload): mark each.
           for (const o of group) await saveOp(refused(o, err))
@@ -321,6 +416,8 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
           }
           await dropOp(o)
           sent++
+          paths.add(pathFor(o))
+          if (o.preview && Number(r.id) > 0) made.push({ path: pathFor(o), row: { ...o.preview, id: Number(r.id) } })
           if (o.tempId !== undefined && Number(r.id) > 0) {
             await swapTempId(scope, o.tempId, Number(r.id))
             madeRows = true
@@ -338,7 +435,9 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
         const res = await send(op)
         await dropOp(op)
         sent++
+        paths.add(pathFor(op))
         const realId = Number(rowIn(res?.data)?.id)
+        if (op.preview && realId > 0) made.push({ path: pathFor(op), row: { ...op.preview, ...rowIn(res?.data), id: realId } })
         if (op.tempId !== undefined && Number.isFinite(realId) && realId > 0) {
           await swapTempId(scope, op.tempId, realId)
           ops = await listOps(scope)
@@ -355,17 +454,18 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
             })
           }
           emit()
-          return { sent, failed, stopped: true }
+          return { sent, failed, stopped: true, paths: Array.from(paths), made }
         }
         if (op.method === 'DELETE' && apiStatus(err) === 404) {
           // Already gone.
           await dropOp(op)
           sent++
+          paths.add(pathFor(op))
           continue
         }
         if (apiStatus(err) === 429) {
           emit()
-          return { sent, failed, stopped: true }
+          return { sent, failed, stopped: true, paths: Array.from(paths), made }
         }
         failed++
         await saveOp(refused(op, err))
@@ -373,13 +473,15 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
       emit()
     }
     emit()
-    return { sent, failed, stopped: false }
+    return { sent, failed, stopped: false, paths: Array.from(paths), made }
   })()
   syncing.set(scope, run)
   emit()
+  void run.then((r) => syncedListeners.forEach((l) => l(scope, r)), () => undefined)
   return run.finally(() => {
     syncing.delete(scope)
     emit()
+    if (again.delete(scope)) void syncOutbox(scope, send)
   })
 }
 
@@ -391,10 +493,21 @@ export const mergeIntoReads = (scope: string, collection: string, changed: Recor
     if (!listsCollection(key, collection)) return undefined
     const rows = listIn(body)
     return rows ? withList(body, mergeRows(key, rows, changed, deleted)) : undefined
-  })
+  }, (key) => listsCollection(key, collection))
 
 // Any other change to the kept answers (e.g. stock levels inside products).
-export const patchKeptReads = (scope: string, fn: (key: string, body: unknown) => unknown | undefined) => patchReads(scope, fn)
+export const patchKeptReads = (scope: string, fn: (key: string, body: unknown) => unknown | undefined, match?: (key: string) => boolean) =>
+  patchReads(scope, fn, match)
+
+// The server answered a write that was also kept (it was slow, `waitMs`):
+// the kept copy isn't needed, unless it's already being sent.
+export const settleKept = async (scope: string, id: string) => {
+  const op = (await listOps(scope)).find((o) => o.id === id)
+  if (op && op.status === 'waiting' && !isSyncing(scope)) {
+    await dropOp(op)
+    emit()
+  }
+}
 
 // Small values kept per scope (e.g. a sync cursor).
 export const getKept = <T>(scope: string, name: string) => offlineStore().get<T>(`k:${scope}|${name}`).catch(() => undefined)
@@ -411,3 +524,13 @@ export const forgetReads = async (scope: string) => {
     // nothing to forget
   }
 }
+
+// Rows made local-first that the server doesn't have yet, for the list at
+// `collection` — screens show them with what they load. `syncState` says
+// whether each is still on its way or was refused.
+export type PendingRow = Record<string, unknown> & { id: number; syncState: 'syncing' | 'needs-attention' }
+
+export const pendingRows = async (scope: string, collection: string): Promise<PendingRow[]> =>
+  (await listOps(scope))
+    .filter((o) => o.preview && o.showIn === collection)
+    .map((o) => ({ ...o.preview!, id: Number(o.preview!.id), syncState: o.status === 'waiting' ? 'syncing' : 'needs-attention' }))

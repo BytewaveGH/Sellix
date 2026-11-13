@@ -180,6 +180,8 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
     if (!lines.length) return
     if (short) return setError('Cash given is less than the total')
     setSending(true)
+    // Charge → receipt, for DevTools' Performance panel (target: under 200 ms).
+    performance.mark('charge:start')
     try {
       const order = await actions.createCounterOrder(r.id, {
         lines: lines.map(({ itemId, quantity, choices, comboPicks, note }) => ({ itemId, quantity, choices, comboPicks, note })),
@@ -187,8 +189,13 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
         customer: { name: customer || undefined, phone: phone || undefined },
         payment: { method, paid, reference: method === 'momo' ? reference : undefined, tendered: cash && given ? given : undefined },
       })
+      performance.mark('charge:saved')
       clear(key)
       setDone(order)
+      requestAnimationFrame(() => {
+        performance.mark('charge:shown')
+        performance.measure('charge', 'charge:start', 'charge:shown')
+      })
       setTicketOpen(false)
       setTendered('')
       setReference('')
@@ -581,7 +588,7 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
             <CheckCircle2 className="mx-auto h-12 w-12 text-teal-600" />
             <p id="sent-title" className="mt-2 text-lg font-extrabold text-stone-900">
-              {done.id < 0 ? `Order #${done.code} saved on this till` : `Order #${done.code} sent to the kitchen`}
+              Order #{done.code} sent to the kitchen
             </p>
             <p className="text-sm text-stone-500">
               {done.fulfilment.type === 'dine-in' ? (done.fulfilment.table ? `Table ${done.fulfilment.table}` : 'Dine-in') : 'Take-away'} ·{' '}
@@ -594,8 +601,8 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
             )}
             {done.id < 0 ? (
               <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-800">
-                You’re offline. It’s on this device’s kitchen board now, and reaches other screens as soon as the connection is
-                back.
+                Saved on this till and on its way to the server — other screens get it in a moment, or as soon as the connection
+                is back. Find it later by its receipt number.
               </p>
             ) : (
               <p className="mt-3 text-xs text-stone-500">

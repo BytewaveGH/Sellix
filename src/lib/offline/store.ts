@@ -9,6 +9,8 @@ export interface OfflineStore {
   delete(key: string): Promise<void>
   // Every [key, value] whose key starts with `prefix`, in key order.
   entries<T>(prefix: string): Promise<[string, T][]>
+  // Just the keys: cheap, nothing is read from disk.
+  keys(prefix: string): Promise<string[]>
 }
 
 export const memoryStore = (): OfflineStore => {
@@ -23,6 +25,10 @@ export const memoryStore = (): OfflineStore => {
         .filter(([k]) => k.startsWith(prefix))
         .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
         .map(([k, v]) => [k, copy(v)] as [string, T]),
+    keys: async (prefix) =>
+      Array.from(map.keys())
+        .filter((k) => k.startsWith(prefix))
+        .sort(),
   }
 }
 
@@ -61,6 +67,8 @@ const idbStore = (): OfflineStore => {
       ])
       return keys.map((k, i) => [String(k), values[i]] as [string, T])
     },
+    keys: async (prefix) =>
+      (await run<IDBValidKey[]>('readonly', (s) => s.getAllKeys(IDBKeyRange.bound(prefix, prefix + '￿')))).map(String),
   }
 }
 
@@ -80,7 +88,7 @@ const fallbackOnError = (primary: OfflineStore): OfflineStore => {
       }
       return (memory[name] as (...a: unknown[]) => Promise<unknown>)(...args)
     }
-  return { get: use('get'), set: use('set'), delete: use('delete'), entries: use('entries') } as OfflineStore
+  return { get: use('get'), set: use('set'), delete: use('delete'), entries: use('entries'), keys: use('keys') } as OfflineStore
 }
 
 let shared: OfflineStore | null = null

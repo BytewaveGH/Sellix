@@ -8,7 +8,7 @@
 import { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { getConnection, reportReachable, reportUnreachable } from '../connection'
 import { isUnreachableError, SLOW_MS } from '../network'
-import { cachedRead, listOps, queueWrite, saveRead, syncOutbox, type OfflineOptions, type Send } from './engine'
+import { cachedRead, listOps, queueWrite, saveRead, settleKept, showWritten, syncOutbox, type OfflineOptions, type Send } from './engine'
 import { cannotQueue, methodOf, tempIdsIn } from './rules'
 
 export type OfflineConfig = {
@@ -42,6 +42,10 @@ const answer = (config: InternalAxiosRequestConfig, data: unknown, kind: 'cached
 // while the server's answer still comes in and is kept for next time.
 export const SLOW_READ_MS = 6000
 
+// How long a write waits for older offline changes to go first.
+const ORDER_WAIT_MS = 3000
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
 const knownOffline = () => getConnection().status === 'offline' || (typeof navigator !== 'undefined' && navigator.onLine === false)
 const browserOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 
@@ -53,6 +57,11 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
     const options = c.offline || undefined
 
     if (methodOf(c) === 'GET') {
+      // Kept current another way: never wait for the network when there's a copy.
+      if (options?.cacheFirst) {
+        const hit = await cachedRead(scope, c)
+        if (hit) return answer(config, hit.body, 'cached', hit.at)
+      }
       // Known to be offline: answer from the device at once, no waiting for a timeout.
       if (knownOffline()) {
         const hit = await cachedRead(scope, c)
@@ -88,22 +97,67 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
       return answer(config, body, 'queued')
     }
 
+    // Local-first (a till's counter order): kept on the device and answered at
+    // once, online or not; sent in the background. The till never waits for
+    // the network — a slow connection doesn't fail, it hangs.
+    if (options?.localFirst && !reason) {
+      const res = await queue()
+      void syncOutbox(scope, send).catch(() => undefined)
+      return res
+    }
+
     if (knownOffline()) {
       if (reason) throw new AxiosError(reason, 'ERR_NETWORK', config, {})
       return queue()
     }
+    // A write the server recognises when it comes twice (clientId): safe to
+    // keep and send again whatever happened to this attempt.
+    const repeatable = !reason && !!options?.safeToRepeat
     if (!reason) {
       const waiting = (await listOps(scope)).some((o) => o.status === 'waiting')
-      // Keep changes in order: what's waiting goes first.
-      if (waiting) await syncOutbox(scope, send).catch(() => undefined)
+      // Keep changes in order: what's waiting goes first — but on a slow
+      // connection don't hold this one up for long (a till sale or order
+      // doesn't depend on earlier changes at all).
+      if (waiting) {
+        const sync = syncOutbox(scope, send).catch(() => undefined)
+        if (!repeatable) await Promise.race([sync, sleep(options?.waitMs ?? ORDER_WAIT_MS)])
+      }
       // About a row that only exists on this device so far: it has to wait for it.
       if (tempIdsIn(c).length > 0) return queue()
     }
+
+    const live = base(config)
+    if (repeatable && options?.waitMs) {
+      // Slow connection: don't keep the till waiting. Past the deadline the
+      // change is kept and answered at once; this request carries on, and if
+      // it lands the kept copy is dropped (if not, it's sent later, and the
+      // server ignores it if it did arrive).
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const deadline = new Promise<'slow'>((resolve) => (timer = setTimeout(() => resolve('slow'), options.waitMs)))
+      const first = await Promise.race([live.then((res) => ({ res }), (err: unknown) => ({ err })), deadline]).finally(() => clearTimeout(timer))
+      if (first === 'slow') {
+        const { op, body } = await queueWrite(scope, c, options)
+        reportReachable(SLOW_MS + 1)
+        live.then(
+          () => settleKept(scope, op.id),
+          () => undefined
+        )
+        return answer(config, body, 'queued')
+      }
+      if ('res' in first) {
+        await showWritten(scope, c, first.res.data, options?.appendTo)
+        return first.res
+      }
+      if (isUnreachableError(first.err)) return queue()
+      throw first.err
+    }
     try {
-      return await base(config)
+      const res = await live
+      await showWritten(scope, c, res.data, options?.appendTo)
+      return res
     } catch (err) {
       // The browser knew it had no network, so the request never left: safe to keep.
-      if (!reason && isUnreachableError(err) && browserOffline()) return queue()
+      if (!reason && isUnreachableError(err) && (browserOffline() || repeatable)) return queue()
       throw err
     }
   }

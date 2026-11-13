@@ -2,6 +2,9 @@
 import { vi } from 'vitest'
 import { memoryStore, setOfflineStore } from '@/lib/offline/store'
 import { cachedRead, getKept, listOps, queueWrite, saveRead, setKept, syncOutbox, type SendRequest } from '@/lib/offline/engine'
+import { offlineKind, withOffline } from '@/lib/offline/adapter'
+import { reportReachable } from '@/lib/connection'
+import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { batchFor, isFullList, listIn, refusalMessage } from '@/lib/offline/rules'
 import { syncEateryMenu, syncRetailCatalogue } from '@/lib/offline/catalogue'
 import { refreshOutcome } from '@/lib/network'
@@ -76,7 +79,7 @@ describe('sending till sales in batches', () => {
         }
       return { data: { status: true, data: {} } }
     }
-    expect(await syncOutbox(SCOPE, send)).toEqual({ sent: 3, failed: 1, stopped: false })
+    expect(await syncOutbox(SCOPE, send)).toMatchObject({ sent: 3, failed: 1, stopped: false })
     expect(sent.map((r) => `${r.method} ${r.url}`)).toEqual(['POST /sync/sales', 'PUT /sales/9812'])
     expect((sent[0].data as { sales: unknown[] }).sales).toHaveLength(3)
     expect(sent[0].headers).toEqual({ 'X-Device-Id': 'till-1' })
@@ -311,7 +314,7 @@ describe('an eatery counter order kept offline', () => {
       fulfilment: { type: 'pickup' as const },
       payment: { method: 'cash' as const, paid: true },
     }
-    const body = offlineOrderBody(menu, input, 'AB12-0007', now()) as any
+    const body = offlineOrderBody(menu, { ...input, clientId: '6f1c2a9e-7a0b-4c55-9a43-3e2f7c1d8b10', receiptNo: 'AB12-0007', soldAt: now().toISOString() }, now()) as any
     const shown = offlineCounterOrder(menu, input, -5, now(), 'AB12-0007')
     expect(body).toMatchObject({
       restaurantId: cafe.id,
@@ -334,5 +337,44 @@ describe('cashier sign-in on bad internet', () => {
     expect(refreshOutcome(null, 'employee')).toBe('unreachable')
     // Owners are unchanged.
     expect(refreshOutcome(500)).toBe('rejected')
+  })
+})
+
+describe('a slow connection never holds the till', () => {
+  const ok = (config: InternalAxiosRequestConfig) => ({ data: { data: { id: 77 } }, status: 201, statusText: 'Created', headers: {}, config, request: {} })
+  const charge = (adapter: AxiosAdapter) =>
+    adapter({
+      method: 'post',
+      url: '/eatery/orders/counter',
+      data: { clientId: 'cid-12345678', lines: [] },
+      headers: {},
+      _scope: SCOPE,
+      offline: { safeToRepeat: true, waitMs: 40, result: () => ({ total: 9 }) },
+    } as unknown as InternalAxiosRequestConfig)
+  beforeEach(() => reportReachable(10))
+
+  it('keeps the order after the deadline, then drops the kept copy when the server answers', async () => {
+    let land!: () => void
+    const base: AxiosAdapter = (config) => new Promise((resolve) => (land = () => resolve(ok(config))))
+    const started = Date.now()
+    const res = await charge(withOffline(base, async () => ({ data: {} })))
+    expect(Date.now() - started).toBeLessThan(1000)
+    expect(offlineKind(res)).toBe('queued')
+    expect(await listOps(SCOPE)).toHaveLength(1)
+    land()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(await listOps(SCOPE)).toEqual([])
+  })
+
+  it('answers straight away when the server is quick', async () => {
+    const res = await charge(withOffline(async (config) => ok(config), async () => ({ data: {} })))
+    expect(offlineKind(res)).toBeNull()
+    expect(await listOps(SCOPE)).toEqual([])
+  })
+
+  it('keeps it when the request fails without an answer, even if the browser thinks it’s online', async () => {
+    const res = await charge(withOffline(async () => Promise.reject(netErr()), async () => ({ data: {} })))
+    expect(offlineKind(res)).toBe('queued')
+    expect((await listOps(SCOPE))[0].data).toMatchObject({ clientId: 'cid-12345678' })
   })
 })

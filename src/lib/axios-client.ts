@@ -3,7 +3,9 @@ import axios, { AxiosRequestConfig } from 'axios'
 import { getSession } from 'next-auth/react'
 import { apiErrorMessage, isSessionRebindError } from './api-error'
 import { forceLogout } from './force-logout'
-import { reportReachable, reportUnreachable } from './connection'
+import { getConnection, reportReachable, reportUnreachable } from './connection'
+import { getSessionSync, setSession } from './session-store'
+import type { Session } from 'next-auth'
 import { isUnreachableError, refreshOutcome } from './network'
 import { refreshOnServer } from './session-refresh'
 import { BILLING_CHANGED_EVENT } from './subscription/events'
@@ -42,9 +44,32 @@ apiClient.defaults.adapter = withOffline(axios.getAdapter(axios.defaults.adapter
 // signing out (their error contract: a 403 never refreshes or logs out).
 const isRealEstateUrl = (url?: string) => /(^|\/)real-estate\//.test(url ?? '')
 
+// The session the page already holds (SessionBridge), while its token is good
+// for a while: no round trip to the app's server before every request, which
+// on a slow connection doubled the wait for everything. Otherwise (no session
+// yet, token about to expire) ask next-auth, which refreshes it.
+const TOKEN_MARGIN_S = 120
+// `quick`: a write kept on the device first only needs to know whose it is.
+const currentSession = async (quick = false): Promise<Session | null> => {
+  const known = getSessionSync()
+  if (quick && known?.user) return known
+  const expiry = Number(known?.user?.accessTokenExpiry) || 0
+  if (known?.user?.accessToken && expiry - Date.now() / 1000 > TOKEN_MARGIN_S) return known
+  // Offline with the token-free copy kept on the device: nothing to ask.
+  if (known?.user && !known.user.accessToken && getConnection().status === 'offline') return known
+  return getSession()
+}
+
+// A refreshed token, for the requests that follow (until the page's session catches up).
+const rememberToken = (accessToken: string, session?: Session | null) => {
+  const base = session ?? getSessionSync()
+  if (base?.user) setSession({ ...base, user: { ...base.user, accessToken } } as Session)
+}
+
 apiClient.interceptors.request.use(async (config) => {
   ;(config as { _startedAt?: number })._startedAt = Date.now()
-  const session = await getSession()
+  const offline = (config as OfflineConfig).offline
+  const session = await currentSession(!!offline && !!offline.localFirst)
   ;(config as OfflineConfig)._scope = sessionScope(session?.user)
   if (session?.user?.accessToken) {
     // A retry after a refresh already carries the new token; the session may still hold the old one.
@@ -123,6 +148,7 @@ apiClient.interceptors.response.use(
         const next = await refreshOnServer()
         if (next?.error === 'RefreshAccessTokenError') throw Object.assign(new Error('refresh refused'), { response: { status: 401 } })
         const newToken = next?.user?.accessToken
+        if (newToken && newToken !== session.user.accessToken) rememberToken(newToken, next as Session)
         // Unchanged: the API couldn't be reached for the refresh. Stay signed in.
         if (!newToken || newToken === session.user.accessToken) throw Object.assign(new Error('refresh unavailable'), { name: 'TypeError' })
         refreshQueue.forEach((q) => q.resume(newToken))
@@ -142,6 +168,7 @@ apiClient.interceptors.response.use(
         }
       )
       const newToken: string = data.data.accessToken
+      rememberToken(newToken)
 
       refreshQueue.forEach((q) => q.resume(newToken))
       refreshQueue = []

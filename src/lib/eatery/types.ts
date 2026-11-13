@@ -225,12 +225,20 @@ export interface Order {
   syncedAt?: string
   stockShort?: boolean
   priceMismatch?: boolean
+  // Rung up on this till and not on the server yet ('syncing'), or refused by it.
+  syncState?: 'syncing' | 'needs-attention'
 }
 
 export type OrderChannel = 'online' | 'counter'
 
 // What staff send from the POS: no prices either — priced like online orders.
 export interface CounterOrderInput {
+  // Made by the till (§13, eatery): the server records an order with a given
+  // clientId once, however many times it's sent.
+  clientId?: string
+  receiptNo?: string
+  deviceId?: string
+  soldAt?: string
   lines: OrderLineInput[]
   fulfilment: { type: 'dine-in' | 'pickup'; table?: string }
   customer?: { name?: string; phone?: string }

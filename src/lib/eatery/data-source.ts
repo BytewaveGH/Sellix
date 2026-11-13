@@ -129,6 +129,8 @@ export const EateryServices = {
   }),
 }
 
+const MENU_RESOURCES = new Set<ResourceName>(['restaurants', 'categories', 'items', 'promotions'])
+
 const unwrap = (res: any) => res?.data?.data ?? res?.data
 const asList = (d: any) => (Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [])
 
@@ -155,7 +157,10 @@ export const createApiSource = (
       throw err
     }
   },
-  list: async (r) => asList(unwrap(await owner(EateryServices.List(r)))),
+  // The menu is read from this device whenever it has it (kept current in the
+  // background, lib/offline/catalogue.ts): the counter never waits for it.
+  list: async (r) =>
+    asList(unwrap(await owner(MENU_RESOURCES.has(r) ? ({ ...EateryServices.List(r), offline: { cacheFirst: true } } as AxiosRequestConfig) : EateryServices.List(r)))),
   create: async (r, body) => unwrap(await owner(EateryServices.Create(r, body))),
   update: async (r, id, body) => unwrap(await owner(EateryServices.Update(r, id, body))),
   remove: async (r, id) => {
@@ -173,6 +178,9 @@ export const createApiSource = (
                 names: offline.names,
                 // Carries a clientId: the server never records it twice.
                 safeToRepeat: true,
+                // Charge never waits for the network: kept on the till and
+                // sent in the background, online or not.
+                localFirst: true,
                 // It belongs on the orders list (and so on the kitchen board).
                 appendTo: '/eatery/orders',
                 label: `Counter order${input.fulfilment.table ? ` · table ${input.fulfilment.table}` : ''}`,
