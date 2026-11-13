@@ -10,12 +10,15 @@ import { apiErrorMessage, apiStatus } from '@/lib/api-error'
 import { createApiSource, createLocalSource, DATA_SOURCE_KIND, type EaterySource, type OrderTicket } from './data-source'
 import { prepareImage, type ImageKind } from './images'
 import { itemNames, offlineCounterOrder, offlineOrderBody } from './offline-order'
-import { nextReceiptNo } from '../till'
+import { newClientId, nextReceiptNo, tillFields } from '../till'
+import { getConnection } from '../connection'
 import { dressForFestival } from './festivals'
 import type { CounterOrderInput, DirectoryEntry, ResourceMap, ResourceName, Restaurant, StorefrontBundle } from './types'
 
 // Network errors and 5xx only, at most twice; a failed query waits for the user.
-const retry = (count: number, err: unknown) => count < 2 && (apiStatus(err) === undefined || (apiStatus(err) ?? 0) >= 500)
+// Offline, never: nothing will answer, and each retry only adds a pause.
+const retry = (count: number, err: unknown) =>
+  count < 2 && getConnection().status !== 'offline' && (apiStatus(err) === undefined || (apiStatus(err) ?? 0) >= 500)
 const notFailed = (q: { state: { status: string } }) => q.state.status !== 'error'
 const QUERY_DEFAULTS = {
   retry,
@@ -226,26 +229,27 @@ export const useEateryActions = () => {
   const refresh = () => qc.invalidateQueries({ queryKey: ['eatery', source.kind] })
   // The menu already on this device, to price a counter order made offline.
   const loaded = <R extends ResourceName>(r: R) => (qc.getQueryData(['eatery', source.kind, 'owner', scope, r]) as ResourceMap[R][] | undefined) ?? []
-  const offlinePreview = (restaurantId: number, input: CounterOrderInput) => {
+  // `input` already carries the till's clientId, receipt number and time.
+  const offlinePreview = (restaurantId: number, input: CounterOrderInput, now: Date) => {
     const restaurant = loaded('restaurants').find((r) => r.id === restaurantId)
     if (!restaurant) return undefined
     const menu = { restaurant, categories: loaded('categories'), items: loaded('items'), promotions: loaded('promotions') }
-    const now = new Date()
-    // Only used if the order has to wait offline; a live order is numbered by the server.
-    let receiptNo: string | undefined
-    const number = () => (receiptNo ??= nextReceiptNo())
     return {
-      result: (tempId: number) => offlineCounterOrder(menu, input, tempId, now, number()),
-      body: () => offlineOrderBody(menu, input, number(), now),
+      result: (tempId: number) => offlineCounterOrder(menu, input, tempId, now, input.receiptNo),
+      body: () => offlineOrderBody(menu, input, now),
       names: itemNames(menu, input),
     }
   }
 
-  const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false): Promise<T> => {
+  // `wait`: hold the caller until the lists have reloaded. Offline it never
+  // waits (the lists come from the device), and a counter order never does:
+  // the till moves on at once and the kitchen board catches up.
+  const run = async <T>(fn: () => Promise<T>, fail: string, quiet = false, wait = true): Promise<T> => {
     setError(null)
     try {
       const out = await fn()
-      await refresh()
+      if (wait && getConnection().status !== 'offline') await refresh()
+      else void refresh()
       return out
     } catch (err) {
       const message = apiErrorMessage(err, fail)
@@ -269,8 +273,12 @@ export const useEateryActions = () => {
     uploadImage: (restaurantId: number, file: File, kind: ImageKind) =>
       run(async () => source.uploadImage(restaurantId, await prepareImage(file, kind), kind), 'Couldn’t upload the image.', true),
     // Counter (POS) order: priced by the source, accepted at once.
-    createCounterOrder: (restaurantId: number, input: CounterOrderInput) =>
-      run(() => source.createCounterOrder(restaurantId, input, offlinePreview(restaurantId, input)), 'Couldn’t send the order.'),
+    createCounterOrder: (restaurantId: number, input: CounterOrderInput) => {
+      // One id and receipt number for this order, however it reaches the server.
+      const now = new Date()
+      const order: CounterOrderInput = source.kind === 'api' ? { ...input, clientId: newClientId(), ...tillFields(nextReceiptNo(), now) } : input
+      return run(() => source.createCounterOrder(restaurantId, order, offlinePreview(restaurantId, order, now)), 'Couldn’t send the order.', false, false)
+    },
     claimDemo: () => run(() => (source.claimDemo ? source.claimDemo() : Promise.resolve([])), 'Couldn’t add the examples.'),
     // Sequential, for building a menu from a preset.
     createMany: <R extends ResourceName>(r: R, bodies: Omit<ResourceMap[R], 'id'>[]) =>

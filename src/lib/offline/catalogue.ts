@@ -54,7 +54,7 @@ const applyStock = (scope: string, stock: Row[], deletedUnits: Set<number>) =>
         return next
       })
     )
-  })
+  }, (key) => listsCollection(key, '/products'))
 
 const applyRetailPage = async (scope: string, page: any, first: boolean) => {
   const products = rows(page?.products)

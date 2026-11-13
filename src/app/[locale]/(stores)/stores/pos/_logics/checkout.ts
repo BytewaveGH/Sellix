@@ -129,6 +129,9 @@ export const classifyCheckoutError = (err: any, names: Record<string, string> = 
 // Long enough for a slow connection; short enough that a cashier isn't left
 // staring at "Processing…" when the connection has gone.
 export const SALE_TIMEOUT_MS = 20_000
+// How long the cashier waits for the server before the sale is kept on the
+// till instead (it carries a clientId, so it's never recorded twice).
+export const SALE_WAIT_MS = 3000
 
 // Offline, the sale is kept on the till (lib/offline) and shown with the
 // till's own prices, which are sent with it: the customer already paid them.
@@ -155,12 +158,16 @@ export const submitSale = async (
           result: () => ({ ...offline.preview, receiptNo: payload.receiptNo, createdAt: offline.preview.createdAt ?? new Date().toISOString() }),
           // The server recognises the clientId and never records it twice.
           safeToRepeat: !!payload.clientId,
+          // Slow connection: after this long the sale is kept on the till and
+          // the cashier moves on; it's recorded once the server answers.
+          waitMs: payload.clientId ? SALE_WAIT_MS : undefined,
           body: () => ({
             ...payload,
             items: payload.items.map((it, i) => ({ ...it, unitPrice: Math.round((offline.preview.items[i]?.unitPrice ?? 0) * 100) / 100 })),
           }),
           names,
-          adjust: (key, body) => (/^\/products(\?|$)/.test(key) ? deductSoldStock(body, payload) : undefined),
+          adjust: (_key, body) => deductSoldStock(body, payload),
+          adjusts: (key) => /^\/products(\?|$)/.test(key),
         }
       : undefined,
   }

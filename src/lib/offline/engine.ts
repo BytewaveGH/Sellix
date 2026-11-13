@@ -73,6 +73,13 @@ export type OfflineOptions = {
   names?: Record<string, string>
   // Further changes to cached answers (e.g. stock going down after a sale).
   adjust?: (key: string, body: unknown) => unknown | undefined
+  // Which kept answers `adjust` looks at (by key), so the rest aren't read.
+  adjusts?: (key: string) => boolean
+  // On a slow connection: if the server hasn't answered in this many ms, keep
+  // the change and answer at once; the request carries on and, if it lands,
+  // the kept copy is dropped. Only for writes the server recognises when they
+  // come twice (a clientId).
+  waitMs?: number
 }
 
 type Cached = { body: unknown; at: string }
@@ -107,11 +114,17 @@ export const cachedRead = async (scope: string, req: RequestLike): Promise<Cache
 }
 
 // Rewrite every cached answer in the scope that `fn` changes.
-const patchReads = async (scope: string, fn: (key: string, body: unknown) => unknown | undefined) => {
+// `match` picks the answers by key first, so only those are read from disk
+// (the kept product catalogue alone can be megabytes).
+const patchReads = async (scope: string, fn: (key: string, body: unknown) => unknown | undefined, match: (key: string) => boolean = () => true) => {
   const store = offlineStore()
   const prefix = readPrefix(scope)
-  for (const [k, v] of await store.entries<Cached>(prefix)) {
-    const next = fn(k.slice(prefix.length), v.body)
+  for (const k of await store.keys(prefix)) {
+    const key = k.slice(prefix.length)
+    if (!match(key)) continue
+    const v = await store.get<Cached>(k)
+    if (!v) continue
+    const next = fn(key, v.body)
     if (next !== undefined && next !== v.body) await store.set(k, { ...v, body: next })
   }
 }
@@ -131,7 +144,7 @@ const showInReads = async (scope: string, req: RequestLike, change: Change, coll
       return body && typeof body === 'object' && 'data' in (body as object) ? { ...(body as object), data: merged } : merged
     }
     return undefined
-  })
+  }, (key) => listsCollection(key, collection) || key === one)
 }
 
 // ── The outbox ───────────────────────────────────────────────────────────────
@@ -190,7 +203,7 @@ export const queueWrite = async (scope: string, req: RequestLike & { timeout?: n
     } else if (shape.kind === 'delete') {
       await showInReads(scope, req, { kind: 'delete', id: shape.id }, shape.collection)
     }
-    if (opts.adjust) await patchReads(scope, opts.adjust)
+    if (opts.adjust) await patchReads(scope, opts.adjust, opts.adjusts)
   } catch {
     // The change is safe in the outbox; only the early preview failed.
   }
@@ -391,10 +404,21 @@ export const mergeIntoReads = (scope: string, collection: string, changed: Recor
     if (!listsCollection(key, collection)) return undefined
     const rows = listIn(body)
     return rows ? withList(body, mergeRows(key, rows, changed, deleted)) : undefined
-  })
+  }, (key) => listsCollection(key, collection))
 
 // Any other change to the kept answers (e.g. stock levels inside products).
-export const patchKeptReads = (scope: string, fn: (key: string, body: unknown) => unknown | undefined) => patchReads(scope, fn)
+export const patchKeptReads = (scope: string, fn: (key: string, body: unknown) => unknown | undefined, match?: (key: string) => boolean) =>
+  patchReads(scope, fn, match)
+
+// The server answered a write that was also kept (it was slow, `waitMs`):
+// the kept copy isn't needed, unless it's already being sent.
+export const settleKept = async (scope: string, id: string) => {
+  const op = (await listOps(scope)).find((o) => o.id === id)
+  if (op && op.status === 'waiting' && !isSyncing(scope)) {
+    await dropOp(op)
+    emit()
+  }
+}
 
 // Small values kept per scope (e.g. a sync cursor).
 export const getKept = <T>(scope: string, name: string) => offlineStore().get<T>(`k:${scope}|${name}`).catch(() => undefined)

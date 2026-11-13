@@ -71,6 +71,8 @@ export interface EaterySource {
   claimDemo?(): Promise<Restaurant[]>
 }
 
+const COUNTER_WAIT_MS = 3000
+
 // A counter order kept on the till while offline (lib/offline): what to show
 // at once, and what to send later (with clientId and the prices paid).
 export type OfflineCounterOrder = {
@@ -173,6 +175,8 @@ export const createApiSource = (
                 names: offline.names,
                 // Carries a clientId: the server never records it twice.
                 safeToRepeat: true,
+                // Slow connection: keep it after 3 s rather than hold the till.
+                waitMs: COUNTER_WAIT_MS,
                 // It belongs on the orders list (and so on the kitchen board).
                 appendTo: '/eatery/orders',
                 label: `Counter order${input.fulfilment.table ? ` · table ${input.fulfilment.table}` : ''}`,

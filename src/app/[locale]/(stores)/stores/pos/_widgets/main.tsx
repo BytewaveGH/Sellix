@@ -1102,7 +1102,7 @@ const Main = () => {
             </div>
             {receipt.offline && (
               <p className="mb-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-800">
-                You’re offline. This sale will be recorded as soon as the connection is back — nothing else to do.
+                The connection is down or slow, so it’s kept here and recorded as soon as the server answers — nothing else to do.
               </p>
             )}
             <div className="flex-1 overflow-y-auto divide-y divide-gray-50">

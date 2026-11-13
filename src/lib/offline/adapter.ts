@@ -8,7 +8,7 @@
 import { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { getConnection, reportReachable, reportUnreachable } from '../connection'
 import { isUnreachableError, SLOW_MS } from '../network'
-import { cachedRead, listOps, queueWrite, saveRead, syncOutbox, type OfflineOptions, type Send } from './engine'
+import { cachedRead, listOps, queueWrite, saveRead, settleKept, syncOutbox, type OfflineOptions, type Send } from './engine'
 import { cannotQueue, methodOf, tempIdsIn } from './rules'
 
 export type OfflineConfig = {
@@ -41,6 +41,10 @@ const answer = (config: InternalAxiosRequestConfig, data: unknown, kind: 'cached
 // A read slower than this is answered from the device (when it has a copy)
 // while the server's answer still comes in and is kept for next time.
 export const SLOW_READ_MS = 6000
+
+// How long a write waits for older offline changes to go first.
+const ORDER_WAIT_MS = 3000
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 const knownOffline = () => getConnection().status === 'offline' || (typeof navigator !== 'undefined' && navigator.onLine === false)
 const browserOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
@@ -92,18 +96,49 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
       if (reason) throw new AxiosError(reason, 'ERR_NETWORK', config, {})
       return queue()
     }
+    // A write the server recognises when it comes twice (clientId): safe to
+    // keep and send again whatever happened to this attempt.
+    const repeatable = !reason && !!options?.safeToRepeat
     if (!reason) {
       const waiting = (await listOps(scope)).some((o) => o.status === 'waiting')
-      // Keep changes in order: what's waiting goes first.
-      if (waiting) await syncOutbox(scope, send).catch(() => undefined)
+      // Keep changes in order: what's waiting goes first — but on a slow
+      // connection don't hold this one up for long (a till sale or order
+      // doesn't depend on earlier changes at all).
+      if (waiting) {
+        const sync = syncOutbox(scope, send).catch(() => undefined)
+        if (!repeatable) await Promise.race([sync, sleep(options?.waitMs ?? ORDER_WAIT_MS)])
+      }
       // About a row that only exists on this device so far: it has to wait for it.
       if (tempIdsIn(c).length > 0) return queue()
     }
+
+    const live = base(config)
+    if (repeatable && options?.waitMs) {
+      // Slow connection: don't keep the till waiting. Past the deadline the
+      // change is kept and answered at once; this request carries on, and if
+      // it lands the kept copy is dropped (if not, it's sent later, and the
+      // server ignores it if it did arrive).
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const deadline = new Promise<'slow'>((resolve) => (timer = setTimeout(() => resolve('slow'), options.waitMs)))
+      const first = await Promise.race([live.then((res) => ({ res }), (err: unknown) => ({ err })), deadline]).finally(() => clearTimeout(timer))
+      if (first === 'slow') {
+        const { op, body } = await queueWrite(scope, c, options)
+        reportReachable(SLOW_MS + 1)
+        live.then(
+          () => settleKept(scope, op.id),
+          () => undefined
+        )
+        return answer(config, body, 'queued')
+      }
+      if ('res' in first) return first.res
+      if (isUnreachableError(first.err)) return queue()
+      throw first.err
+    }
     try {
-      return await base(config)
+      return await live
     } catch (err) {
       // The browser knew it had no network, so the request never left: safe to keep.
-      if (!reason && isUnreachableError(err) && browserOffline()) return queue()
+      if (!reason && isUnreachableError(err) && (browserOffline() || repeatable)) return queue()
       throw err
     }
   }

@@ -594,8 +594,8 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
             )}
             {done.id < 0 ? (
               <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-800">
-                You’re offline. It’s on this device’s kitchen board now, and reaches other screens as soon as the connection is
-                back.
+                The connection is down or slow, so it’s kept here. It’s on this device’s kitchen board now, and reaches other
+                screens as soon as the server answers.
               </p>
             ) : (
               <p className="mt-3 text-xs text-stone-500">

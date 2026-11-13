@@ -165,6 +165,29 @@ describe('cashier token refresh', () => {
   })
 })
 
+describe('no session round trip before each request', () => {
+  it('uses the session the page already has while its token is good', async () => {
+    vi.resetModules()
+    const { setSession } = await import('@/lib/session-store')
+    const { apiClient } = await import('@/lib/axios-client')
+    getSession.mockClear()
+    setSession({ user: { accessToken: 'tok', accessTokenExpiry: Math.floor(Date.now() / 1000) + 3600, tenant: 'acme' }, expires: '' } as any)
+    let auth = ''
+    apiClient.defaults.adapter = async (config) => {
+      auth = String(config.headers?.Authorization)
+      return { data: {}, status: 200, statusText: 'OK', headers: {}, config }
+    }
+    await apiClient.get('/products')
+    expect(auth).toBe('Bearer tok')
+    expect(getSession).not.toHaveBeenCalled()
+    // About to expire: next-auth is asked (and refreshes it).
+    getSession.mockResolvedValue({ user: { accessToken: 'fresh', tenant: 'acme' } })
+    setSession({ user: { accessToken: 'tok', accessTokenExpiry: Math.floor(Date.now() / 1000) + 30, tenant: 'acme' }, expires: '' } as any)
+    await apiClient.get('/products')
+    expect(auth).toBe('Bearer fresh')
+  })
+})
+
 describe('connection status', () => {
   it('turns slow on slow answers and back to online on quick ones', () => {
     reportReachable(6000)
