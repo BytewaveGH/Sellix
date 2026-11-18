@@ -1,0 +1,59 @@
+{
+  "name": "sellix-desktop",
+  "productName": "Sellix POS",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sellix POS",
+  "main": "main.js",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs",
+    "start": "node scripts/start.mjs",
+    "dist": "npm run build:web && electron-builder --win && node scripts/copy-installer.mjs",
+    "dist:dir": "npm run build:web && electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "app.sellix.pos",
+    "productName": "Sellix POS",
+    "directories": {
+      "app": ".",
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "business.js",
+      "loading.html",
+      "setup.html",
+      "setup.js",
+      "setup-preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "next-server",
+        "to": "next-server",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "../src/app/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Sellix POS"
+    }
+  }
+}

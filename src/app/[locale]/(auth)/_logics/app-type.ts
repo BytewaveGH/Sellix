@@ -2,10 +2,10 @@
 // sign-in pages' picture. null on the main site or if it can't be told.
 
 import { headers } from 'next/headers'
-import { classifyHost } from '@/lib/tenant'
+import { hostTenantSlug } from '@/lib/tenant'
 
 export async function appTypeForThisSite(): Promise<string | null> {
-  const { slug } = classifyHost(headers().get('host'))
+  const slug = hostTenantSlug(headers().get('host'))
   if (!slug) return null
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/platform/tenants/lookup?slug=${encodeURIComponent(slug)}`, {

@@ -53,6 +53,15 @@ const EMPLOYEE_ROUTE_PRIORITY = [
   { path: '/eatery/brand', perm: 'canManageProducts' },
   { path: '/eatery/settings', perm: 'canManageOperations' },
   { path: '/eatery', perm: 'canViewReports' },
+  // Amusement — same permission keys as its sidebar.
+  { path: '/amusement/counter', perm: 'canManageSales' },
+  { path: '/amusement/gate', perm: 'canManageSales' },
+  { path: '/amusement/tickets', perm: 'canManageSales' },
+  { path: '/amusement/bookings', perm: ['canManageSales', 'canViewReports'] },
+  { path: '/amusement/leaderboard', perm: 'canManageSales' },
+  { path: '/amusement/wheel', perm: 'canManageSales' },
+  { path: '/amusement/attractions', perm: 'canManageProducts' },
+  { path: '/amusement', perm: 'canViewReports' },
 ]
 
 // A route's `perm` is one key, or a list of which any one is enough.
@@ -60,7 +69,8 @@ const allows = (user: any, perm: string | string[]) => (Array.isArray(perm) ? pe
 
 // Redirect targets stay inside the employee's own vertical. Retail (and the
 // verticals without their own routes yet) keep using the /stores list.
-const verticalRoot = (appType: unknown) => (appType === 'real-estate' ? '/real-estate' : appType === 'eatery' ? '/eatery' : '/stores')
+const verticalRoot = (appType: unknown) =>
+  appType === 'real-estate' ? '/real-estate' : appType === 'eatery' ? '/eatery' : appType === 'amusement' ? '/amusement' : '/stores'
 
 function firstAllowedPath(user: any, locale: string): string {
   const root = verticalRoot(user.appType)
@@ -119,7 +129,8 @@ export default auth((req: NextAuthRequest) => {
   }
 
   // Permission guard for employees
-  if (isLoggedIn && req.auth?.user?.accountType === 'employee') {
+  // (The public Hall of Fame board is open to everyone, signed in or not.)
+  if (isLoggedIn && req.auth?.user?.accountType === 'employee' && !AMUSEMENT_BOARD_RE.test(pathname)) {
     const user = req.auth.user as any
     const locale = pathname.split('/')[1] || 'en'
 

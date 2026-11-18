@@ -1,165 +1,189 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
-import ButtonTemplate from '@/components/templates/button'
-import DatagridTemplate from '@/components/templates/datagrid'
+// Attractions as cards: each ride's colour, price, capacity, today's guests,
+// and its status changed in one tap (open / maintenance / closed) — the ticket
+// counter stops selling it straight away.
+
+import React, { useState } from 'react'
+import { Pencil, Plus, Sparkles, Trash2, Users } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Button, Card, EmptyState, LoadingGrid, PageHeader } from '@/components/kit/ui'
+import { ConfirmDialog } from '@/components/kit/form'
 import { SheetTemplate } from '@/components/templates/sheet'
-import { useFetchData } from '@/hooks/use-fetch'
 import { useAxios } from '@/hooks/use-axios'
-import { IGeneric } from '@/types/interfaces'
-import { Wrench } from 'lucide-react'
+import { apiErrorMessage } from '@/lib/api-error'
+import { cn } from '@/lib/utils'
+import { money, type Attraction } from '@/lib/amusement/park'
 import CreateAttraction from './_forms/create-attraction'
 import { AttractionServices } from '../_logics/services'
-import { attractionTypeLabel, attractionTypeColor, attractionTypeIcon } from '../_logics/attraction-types'
+import { attractionGradient, attractionTypeIcon, attractionTypeLabel } from '../_logics/attraction-types'
+import { STATUS, useAttractions, useTickets } from '../../_components/park'
 
-const STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  maintenance: 'bg-amber-100 text-amber-700',
-  closed: 'bg-gray-100 text-gray-500',
-}
+const STATUSES: Attraction['status'][] = ['active', 'maintenance', 'closed']
 
 const Main = () => {
   const request = useAxios()
+  const qc = useQueryClient()
+  const { attractions, isLoading, refetch } = useAttractions()
+  const { tickets } = useTickets()
+  const [editing, setEditing] = useState<Attraction | null | 'new'>(null)
+  const [removing, setRemoving] = useState<Attraction | null>(null)
+  const [error, setError] = useState('')
 
-  const [states, setStates] = useState<{ isModalOpen: boolean; selectedAttraction: any | null }>({
-    isModalOpen: false,
-    selectedAttraction: null,
-  })
+  const today = new Date().toDateString()
+  const guestsToday = (id: number) =>
+    tickets.filter((t) => t.attractionId === id && t.createdAt && new Date(t.createdAt).toDateString() === today).reduce((n, t) => n + t.quantity, 0)
 
-  const { data: attractions, isLoading, refetch } = useFetchData('attractions', AttractionServices.FetchAll() as unknown as IGeneric)
-
-  const handleDelete = async (id: number) => {
+  const setStatus = async (a: Attraction, status: Attraction['status']) => {
+    if (a.status === status) return
+    setError('')
+    // Show it at once; put it back if the server says no.
+    qc.setQueryData(['attractions'], (old: unknown) => (Array.isArray(old) ? old.map((x: Attraction) => (x.id === a.id ? { ...x, status } : x)) : old))
     try {
-      await request(AttractionServices.Delete(id))
-      refetch()
+      await request(AttractionServices.Update(a.id, { status }))
     } catch (err) {
-      console.error('Delete attraction failed:', err)
+      setError(`${a.name}: ${apiErrorMessage(err, 'the change wasn’t saved')}`)
+      void refetch()
     }
   }
 
-  const columns = useMemo(
-    () => [
-      { field: 'id', headerName: 'ID', width: 80 },
-      {
-        field: 'name',
-        headerName: 'Attraction',
-        flex: 1,
-        cellRenderer: ({ data }: any) => {
-          const Icon = attractionTypeIcon(data?.type)
-          return (
-            <div className="flex items-center gap-2 h-full">
-              <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${attractionTypeColor(data?.type)}`}>
-                <Icon className="h-3.5 w-3.5" />
-              </div>
-              <span className="truncate">{data?.name}</span>
-              <span title="Custom-built attraction" className="flex-shrink-0">
-                <Wrench className="h-3 w-3 text-gray-300" aria-label="Custom-built attraction" />
-              </span>
-            </div>
-          )
-        },
-      },
-      {
-        field: 'type',
-        headerName: 'Type',
-        width: 160,
-        cellRenderer: ({ value }: any) => (
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${attractionTypeColor(value)}`}>{attractionTypeLabel(value)}</span>
-        ),
-      },
-      { field: 'capacity', headerName: 'Capacity', width: 110 },
-      {
-        field: 'ticketPrice',
-        headerName: 'Ticket Price',
-        width: 130,
-        valueFormatter: ({ value }: any) => `₵${Number(value ?? 0).toFixed(2)}`,
-      },
-      {
-        field: 'status',
-        headerName: 'Status',
-        width: 140,
-        cellRenderer: ({ value }: any) => (
-          <span
-            className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[value] ?? 'bg-gray-100 text-gray-500'}`}
-          >
-            {value ?? 'active'}
-          </span>
-        ),
-      },
-      {
-        field: 'actions',
-        headerName: '',
-        width: 110,
-        pinned: 'right' as const,
-        sortable: false,
-        filter: false,
-        cellRenderer: ({ data }: any) => (
-          <div className="flex items-center gap-1 h-full">
-            <button
-              className="text-xs text-endeavour hover:underline"
-              onClick={() => setStates((s) => ({ ...s, selectedAttraction: data, isModalOpen: true }))}
-            >
-              Edit
-            </button>
-            <span className="text-gray-300">|</span>
-            <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(data.id)}>
-              Delete
-            </button>
-          </div>
-        ),
-      },
-    ],
-    []
-  )
+  const remove = async () => {
+    if (!removing) return
+    try {
+      await request(AttractionServices.Delete(removing.id))
+      void refetch()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Couldn’t delete it.'))
+    } finally {
+      setRemoving(null)
+    }
+  }
 
   return (
-    <div className="w-full h-full">
+    <div className="mx-auto w-full max-w-7xl">
       <SheetTemplate
-        open={states.isModalOpen}
-        handleOpen={() => setStates((s) => ({ ...s, isModalOpen: true }))}
-        handleClose={() => setStates((s) => ({ ...s, isModalOpen: false, selectedAttraction: null }))}
-        title={states.selectedAttraction ? 'Edit Attraction' : 'Add Attraction'}
+        open={editing !== null}
+        handleOpen={() => undefined}
+        handleClose={() => setEditing(null)}
+        title={editing && editing !== 'new' ? `Edit ${editing.name}` : 'Add an attraction'}
         contentBodyClassName="flex flex-col"
         content={
           <CreateAttraction
-            mode={states.selectedAttraction ? 'update' : 'create'}
-            attractionId={states.selectedAttraction?.id}
-            initialData={states.selectedAttraction ?? undefined}
+            mode={editing && editing !== 'new' ? 'update' : 'create'}
+            attractionId={editing && editing !== 'new' ? editing.id : undefined}
+            initialData={editing && editing !== 'new' ? (editing as React.ComponentProps<typeof CreateAttraction>['initialData']) : undefined}
             onSuccess={() => {
-              refetch()
-              setStates((s) => ({ ...s, isModalOpen: false, selectedAttraction: null }))
+              void refetch()
+              setEditing(null)
             }}
           />
         }
       />
 
-      <nav className="w-full">
-        <aside className="w-full flex justify-between items-center p-4">
-          <div>
-            <h2 className="bytewave-heading text-base">Attractions</h2>
-            <p className="bytewave-paragraph text-xs">Manage rides, attractions, and their capacity</p>
-            <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-              <Wrench className="h-3 w-3" /> Every attraction here is custom-built for your park
-            </p>
-          </div>
-          <ButtonTemplate
-            isText
-            text="Add Attraction"
-            handleClick={() => setStates((s) => ({ ...s, selectedAttraction: null, isModalOpen: true }))}
-          />
-        </aside>
-      </nav>
-      <div className="overflow-x-auto">
-        <DatagridTemplate
-          columns={columns}
-          data={(attractions as unknown as any[]) ?? []}
-          loadingIndicator={isLoading}
-          enablePagination
-          paginationPageSize={20}
-          paginationPageSizeSelector={[10, 20, 50]}
-          selectionType="singleRow"
+      <PageHeader
+        eyebrow="Amusement"
+        title="Attractions"
+        description="Your rides and games. Change a status in one tap — the ticket counter follows straight away."
+        actions={
+          <Button icon={Plus} onClick={() => setEditing('new')} className="bg-violet-600 hover:bg-violet-700">
+            Add attraction
+          </Button>
+        }
+      />
+
+      {error && (
+        <p role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </p>
+      )}
+
+      {isLoading && !attractions.length ? (
+        <LoadingGrid count={6} />
+      ) : !attractions.length ? (
+        <EmptyState
+          icon={Sparkles}
+          title="No attractions yet"
+          description="Add go-karts, trampolines, an arcade… then sell tickets for them at the counter."
+          action={
+            <Button icon={Plus} onClick={() => setEditing('new')}>
+              Add your first attraction
+            </Button>
+          }
         />
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {attractions.map((a) => {
+            const Icon = attractionTypeIcon(a.type)
+            const guests = guestsToday(a.id)
+            return (
+              <Card key={a.id} className="overflow-hidden">
+                <div className="relative h-28 overflow-hidden p-4 text-white" style={{ backgroundImage: attractionGradient(a.type) }}>
+                  <Icon className="absolute -bottom-6 -right-4 h-32 w-32 text-white/15" strokeWidth={1.4} aria-hidden />
+                  <span className="inline-flex items-center rounded-full bg-black/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+                    {attractionTypeLabel(a.type)}
+                  </span>
+                  <p className="relative mt-2 text-xl font-black leading-tight">{a.name}</p>
+                  <span className={cn('absolute right-4 top-4 h-3 w-3 rounded-full ring-2 ring-white', STATUS[a.status]?.dot)} aria-hidden />
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-lg font-extrabold tabular-nums text-stone-900">{money(a.ticketPrice)}</p>
+                      <p className="text-[11px] text-stone-500">per ticket</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-extrabold tabular-nums text-stone-900">{a.capacity}</p>
+                      <p className="text-[11px] text-stone-500">at a time</p>
+                    </div>
+                    <div>
+                      <p className="flex items-center justify-center gap-1 text-lg font-extrabold tabular-nums text-stone-900">
+                        <Users className="h-4 w-4 text-stone-400" />
+                        {guests}
+                      </p>
+                      <p className="text-[11px] text-stone-500">today</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1" role="radiogroup" aria-label={`${a.name} status`}>
+                    {STATUSES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        aria-checked={a.status === s}
+                        onClick={() => void setStatus(a, s)}
+                        className={cn(
+                          'flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition',
+                          a.status === s ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-800'
+                        )}
+                      >
+                        <span className={cn('h-2 w-2 rounded-full', STATUS[s].dot)} aria-hidden />
+                        {STATUS[s].label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex justify-end gap-1">
+                    <Button variant="ghost" size="sm" icon={Pencil} onClick={() => setEditing(a)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" icon={Trash2} onClick={() => setRemoving(a)} className="text-rose-600 hover:bg-rose-50">
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!removing}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={`Delete ${removing?.name ?? 'this attraction'}?`}
+        description="It disappears from the counter and the leaderboard. Tickets already sold keep working."
+        confirmLabel="Delete"
+        onConfirm={remove}
+      />
     </div>
   )
 }

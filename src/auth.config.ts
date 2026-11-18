@@ -3,7 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import type { ExtendedUser } from './types/next-auth'
 import { SignInFormSchema } from './types/schemas/schema'
 import { IAuth } from './types/interfaces'
-import { classifyHost } from './lib/tenant'
+import { hostTenantSlug } from './lib/tenant'
 import { EMPLOYEE_REFRESH_LEAD_S, refreshOutcome } from './lib/network'
 import { lookupTenantAppType, normalizeAppType } from './lib/app-type'
 import { LOGIN_CODES, encodeBusinessChoice, type OwnerBusiness } from './lib/owner-login'
@@ -29,8 +29,7 @@ const ADMIN_PERMS = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const whichTenant = (req: Request): string => {
-  const { slug } = classifyHost(req.headers.get('host'))
-  return slug ?? 'admin'
+  return hostTenantSlug(req.headers.get('host')) ?? 'admin'
 }
 
 // Errors surfaced to signIn() as `code` (see src/lib/owner-login.ts).

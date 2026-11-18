@@ -12,7 +12,7 @@ import { Form } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
 import { useTranslations } from 'next-intl'
 import { UpdateStates } from '@/lib/functions/update-states'
-import { classifyHost, redirectPathForAppType } from '@/lib/tenant'
+import { clientTenantSlug, redirectPathForAppType } from '@/lib/tenant'
 import { decodeBusinessChoice, ownerLoginErrorMessage, type OwnerBusiness } from '@/lib/owner-login'
 import { verticalMeta } from '@/lib/verticals'
 import { ArrowLeft, ChevronRight, Loader2 } from 'lucide-react'
@@ -59,7 +59,7 @@ export default function SignInForm() {
   const [choices, setChoices] = useState<OwnerBusiness[] | null>(null)
   const [signingInto, setSigningInto] = useState<string | null>(null)
   const [hostSlug, setHostSlug] = useState<string | null>(null)
-  useEffect(() => setHostSlug(classifyHost(window.location.host).slug), [])
+  useEffect(() => setHostSlug(clientTenantSlug()), [])
 
   const attemptSignIn = async (tenant?: string) => {
     const { email, password } = form.getValues()
@@ -212,6 +212,13 @@ export default function SignInForm() {
               {states.isLoading ? 'Signing in...' : `${signInText('login')}`}
             </Button>
           </form>
+          {/* Staff have their own sign-in. A real tap target: some tills only have an on-screen keyboard. */}
+          <p className="text-center bytewave-paragraph text-gray-400 mt-6">
+            Staff?{' '}
+            <Link href={`/${locale}/staff`} className="inline-block py-2 px-1 font-semibold text-endeavour hover:underline">
+              Sign in here
+            </Link>
+          </p>
         </Form>
       )}
     </div>

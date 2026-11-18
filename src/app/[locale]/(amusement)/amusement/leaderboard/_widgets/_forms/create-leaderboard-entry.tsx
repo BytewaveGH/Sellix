@@ -14,6 +14,9 @@ import { IGeneric } from '@/types/interfaces'
 import { LeaderboardServices } from '../../_logics/services'
 import { AttractionServices } from '../../../attractions/_logics/services'
 import { attractionMetric } from '../../../attractions/_logics/attraction-types'
+import { buildBoards, wouldRank } from '@/lib/amusement/leaderboard'
+import type { LeaderboardEntry } from '@/lib/amusement/park'
+import { Crown, Medal } from 'lucide-react'
 
 const entrySchema = z.object({
   attractionId: z.string().min(1, 'Attraction is required'),
@@ -50,6 +53,19 @@ const CreateLeaderboardEntry = ({ onSuccess }: CreateLeaderboardEntryProps) => {
   const selectedAttractionId = form.watch('attractionId')
   const selectedAttraction = ((attractions as unknown as any[]) ?? []).find((a) => String(a.id) === selectedAttractionId)
   const metric = attractionMetric(selectedAttraction?.type)
+
+  // Where this score would land, as it's typed: the fun part of recording one.
+  const { data: entries } = useFetchData('leaderboard', LeaderboardServices.FetchAll() as unknown as IGeneric)
+  const score = Number(form.watch('score'))
+  const board = selectedAttraction
+    ? buildBoards(
+        ((entries as unknown as LeaderboardEntry[]) ?? []).filter((e) => e.attractionId === selectedAttraction.id),
+        () => ({ name: selectedAttraction.name, type: selectedAttraction.type }),
+        attractionMetric,
+        new Date()
+      )[0]
+    : undefined
+  const rank = selectedAttraction && Number.isFinite(score) && score > 0 ? wouldRank(board, score) : null
 
   const onSubmit = async (data: EntryForm) => {
     setSubmitError('')
@@ -116,6 +132,19 @@ const CreateLeaderboardEntry = ({ onSuccess }: CreateLeaderboardEntryProps) => {
           <InputsTemplate control={form.control} name="achievedAt" label="Date" inputType="date" isRequired />
         </div>
         <div className="mt-auto border-t border-gray-200 pt-4 pb-2 flex flex-col gap-2">
+          {rank !== null &&
+            (rank === 1 ? (
+              <p
+                className="flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-extrabold text-white"
+                style={{ backgroundImage: 'linear-gradient(135deg, #6D28D9, #DB2777)' }}
+              >
+                <Crown className="h-4 w-4 text-yellow-300" /> {board ? 'New park record!' : 'First score on the board!'}
+              </p>
+            ) : (
+              <p className="flex items-center justify-center gap-2 rounded-xl bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-800">
+                <Medal className="h-4 w-4" /> Would be #{rank} on the board
+              </p>
+            ))}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
           <ButtonTemplate isText text={isSubmitting ? 'Saving...' : 'Add Entry'} type="submit" isDisabled={isSubmitting} />
         </div>

@@ -99,10 +99,11 @@ export default function StaffSignInForm() {
         </form>
       </Form>
 
+      {/* A real tap target: some tills only have an on-screen keyboard. */}
       <p className="text-center bytewave-paragraph text-gray-400 mt-6">
-        Store owner?{' '}
-        <Link href={`/${locale}`} className="text-endeavour hover:underline">
-          Admin login
+        Owner?{' '}
+        <Link href={`/${locale}`} className="inline-block py-2 px-1 font-semibold text-endeavour hover:underline">
+          Sign in here
         </Link>
       </p>
     </div>

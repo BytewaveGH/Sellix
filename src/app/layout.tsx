@@ -2,7 +2,7 @@ import { Providers } from '@/components/generals/providers'
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import { headers } from 'next/headers'
-import { classifyHost } from '@/lib/tenant'
+import { DESKTOP_BUSINESS_META, desktopBusiness, hostTenantSlug } from '@/lib/tenant'
 import './globals.css'
 // import { Providers } from '@/components/providers'
 
@@ -17,11 +17,14 @@ const mulish = localFont({
 })
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { slug } = classifyHost(headers().get('host'))
+  const slug = hostTenantSlug(headers().get('host'))
+  const desktop = desktopBusiness()
   return {
     title: slug ?? 'sellix',
     description:
       'Sellix — multi-tenant point-of-sale and business management platform, powering retail, eatery, and amusement park operations from one dashboard.',
+    // Desktop app only: tells the browser side which business this till is set up for.
+    ...(desktop ? { other: { [DESKTOP_BUSINESS_META]: desktop } } : {}),
   }
 }
 

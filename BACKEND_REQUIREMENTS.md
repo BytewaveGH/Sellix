@@ -979,6 +979,64 @@ Done in the frontend: a refresh that fails *because the server can't be reached*
 2. **A bad or expired refresh token should get 401, not 500.** `sellix.account`'s `RefreshToken` handler answers every error with 500 (`app/framework/http/handlers/api/auth.go`). The frontend has to treat a 500 from `/auth/refresh` as "session over", so a real server crash there also logs people out. With 401 for "token rejected", a 500 can safely mean "try again later".
 3. **`GET /health`** on `sellix.apis`: no auth, no tenant, returns `200 {"ok":true}` quickly. The connection indicator checks the API about every 15 seconds while there's a problem. Today it sends a `HEAD` to the API's base address and counts any answer (even a 404) as "reachable"; a real health route would also catch "the server answers but the database is down".
 
+## 14. Amusement park: ticket counter, gate and park day (additions to §4)
+
+The amusement module now has:
+
+- a **ticket counter** that prints tickets with a QR code;
+- a **gate check-in** screen that scans them;
+- a **park dashboard** (guests, takings, hourly sales, ride status);
+- a **Hall of Fame** lobby board;
+- a **prize wheel**.
+
+All of it runs on today's §4 endpoints, with workarounds where the data falls short. These asks remove the workarounds.
+
+### 14.1 A real ticket code (most important)
+
+Tickets today are identified only by their sequential `id`, so a guessed id could be printed as a fake ticket. The frontend prints `T{id}-{check}`, where the 3-character check is derived from the id and the exact `createdAt`. That's an interim guard, not real security.
+
+- **Field:** add `code` to `Ticket`: random, at least 10 characters from an unambiguous alphabet (no 0/O/1/I), unique per tenant, generated on create and returned everywhere a ticket is.
+- **Lookup:** add `GET /tickets/by-code/:code`, returning the ticket (with its attraction) or 404. Permission: `canManageSales`.
+- **QR:** once `code` exists, the QR will carry it and the gate will look tickets up by it, instead of downloading every ticket.
+
+### 14.2 Redeem must refuse a used ticket
+
+`PATCH /tickets/:id/redeem` sets `redeemed` even when the ticket is already redeemed (`app/application/ticket/repository.go`, `redeem`). So two gates can both admit the same ticket. The gate checks the status first, but that's a race.
+
+- **Already used:** do it in one statement, `UPDATE … SET status='redeemed', redeemed_at=now() WHERE id=? AND status='valid'`. If no row changed, answer **409** `{ "code": "already_redeemed", "redeemedAt": "…" }`.
+- **New fields:** `redeemedAt` (time) and `redeemedBy` (employee id) on the ticket. The gate will then show *when* a ticket was used ("ALREADY USED at 10:42"), and the dashboard can count admissions per hour.
+
+### 14.3 What was paid for a ticket
+
+Tickets have no price. The dashboard's takings are an estimate: quantity × the attraction's *current* price, or the general admission price set on the counter. That goes wrong as soon as a price changes. Add to `CreateTicketRequest` and `Ticket`:
+
+```json
+{ "attractionId": 3, "quantity": 2, "buyerName": "Ama",
+  "unitPrice": 50, "paymentType": "cash", "clientId": "6f1c…", "soldAt": "2026-11-16T10:02:31Z" }
+```
+
+- **`unitPrice`:** the price charged, kept on the ticket. If omitted, use the attraction's price at the time, or the park's admission price (§14.4).
+- **`paymentType`:** `cash` | `momo` | `card`.
+- **`clientId` and `soldAt`:** same rules as §13.1, so tickets sold offline are recorded once and dated right.
+- **Reports:** add `GET /tickets?from=&to=` so the dashboard loads only the day it shows. Today it downloads every ticket ever sold.
+
+### 14.4 Park settings, shared by every till
+
+The **park name**, the **general admission price** (tickets with no attraction), the **ticket footer message** and the **prize wheel's prizes** are kept on each device today. Add `GET/PUT /amusement/settings`:
+
+```json
+{ "parkName": "Bambo Adventure Park", "admissionPrice": 30, "ticketNote": "Have fun!",
+  "prizes": [ { "id": "free-ride", "label": "Free ride", "color": "#7C3AED", "weight": 1 } ] }
+```
+
+- **Who:** owner and `canManageProducts` may write; any staff may read.
+- **Public:** `GET /public/amusement/park` should return `{ parkName }`, so the Hall of Fame board can show the park's name.
+
+### 14.5 Small fixes
+
+- **Price can't go back to 0.** `PUT /attractions/:id` ignores `ticketPrice: 0` and `capacity: 0` (it only sets values > 0), so a ride can't be made free again. Use pointer fields (`*float64`, `*int`) so 0 means 0.
+- **Bookings need a time.** `date` is a day, but group visits and birthday parties are booked for a time slot. Accept a full date-time and return it. Optionally add `durationMinutes`.
+
 ## Priority
 
 1. Tenant CRUD + owner-account creation (§1) — unblocks the whole "register a new business" flow for real, replaces the local JSON-file placeholder entirely.
@@ -992,7 +1050,8 @@ Done in the frontend: a refresh that fails *because the server can't be reached*
 9. Store module (§11) — §11.1 store settings first, so every till shares the receipt and payment setup. Then the list filters (§11.2).
 10. Real-estate public website (§12) — §12.2 and §12.3 make the shared link work for everyone, not just on the owner's device. Photos need §12.2's image upload.
 11. Offline selling (§13) — §13.1 first: a `clientId` on sales makes retries safe, which helps even on today's flaky connections. Then batch sync (§13.2) and "changes since" downloads (§13.3).
-12. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
-13. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
+12. Amusement (§14) — §14.2 first (two gates can admit the same ticket today), then §14.1 ticket codes and §14.3 prices on tickets.
+13. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
+14. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
 
 Happy to hop on a call to go through response shapes/edge cases once you've had a look.
