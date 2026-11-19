@@ -55,3 +55,23 @@ export const ATTRACTION_METRICS: Record<AttractionType, { label: string; unit: s
 
 export const attractionMetric = (type: string | null | undefined) =>
   ATTRACTION_METRICS[(type as AttractionType) ?? 'other'] ?? ATTRACTION_METRICS.other
+
+// Bright, saturated tiles for the ticket counter, ride board and Hall of Fame.
+// White icon and text sit on top, so each pair keeps white readable (≥3:1).
+export const ATTRACTION_GRADIENTS: Record<AttractionType, [string, string]> = {
+  skating: ['#0369A1', '#0284C7'],
+  'go-karting': ['#B91C1C', '#EA580C'],
+  arcade: ['#6D28D9', '#C026D3'],
+  trampoline: ['#047857', '#059669'],
+  paintball: ['#C2410C', '#EA580C'],
+  'bubble-soccer': ['#0E7490', '#0891B2'],
+  'foot-dart': ['#3F6212', '#4D7C0F'],
+  'sumo-wrestling': ['#9F1239', '#E11D48'],
+  'human-foosball': ['#4338CA', '#6366F1'],
+  other: ['#6D28D9', '#DB2777'],
+}
+
+export const attractionGradient = (type: string | null | undefined) => {
+  const [from, to] = ATTRACTION_GRADIENTS[(type as AttractionType) ?? 'other'] ?? ATTRACTION_GRADIENTS.other
+  return `linear-gradient(135deg, ${from}, ${to})`
+}

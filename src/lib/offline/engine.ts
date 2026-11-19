@@ -120,6 +120,18 @@ export const saveRead = (scope: string, req: RequestLike, body: unknown) =>
     .set(readPrefix(scope) + readKey(req), { body: parsed(body), at: new Date().toISOString() } satisfies Cached)
     .catch(() => undefined)
 
+// The server's newer answer replaces the kept one. Resolves to whether it
+// changed anything (so screens only re-read when there's something new).
+export const refreshRead = async (scope: string, req: RequestLike, before: unknown, body: unknown): Promise<boolean> => {
+  const next = parsed(body)
+  await saveRead(scope, req, next)
+  try {
+    return JSON.stringify(next) !== JSON.stringify(before)
+  } catch {
+    return true
+  }
+}
+
 export const cachedRead = async (scope: string, req: RequestLike): Promise<Cached | undefined> => {
   try {
     return await offlineStore().get<Cached>(readPrefix(scope) + readKey(req))

@@ -1,15 +1,16 @@
 // The API client's offline layer (installed in axios-client.ts), so every
 // module works offline without changing its screens:
-//   GET   — answered by the server and remembered; while the server can't be
-//           reached, the last answer is given back instead.
+//   GET   — remembered per business and user. Once a screen's data has been
+//           loaded on this device, it's shown at once when the server is slow
+//           or unreachable, and refreshed from the server in the background.
 //   other — while offline, kept on this device and answered as if saved;
 //           sent in order when the connection is back (engine.ts).
 
 import { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { getConnection, reportReachable, reportUnreachable } from '../connection'
 import { isUnreachableError, SLOW_MS } from '../network'
-import { cachedRead, listOps, queueWrite, saveRead, settleKept, showWritten, syncOutbox, type OfflineOptions, type Send } from './engine'
-import { cannotQueue, methodOf, tempIdsIn } from './rules'
+import { cachedRead, listOps, queueWrite, refreshRead, saveRead, settleKept, showWritten, syncOutbox, type OfflineOptions, type Send } from './engine'
+import { cannotKeepRead, cannotQueue, methodOf, readKey, tempIdsIn } from './rules'
 
 export type OfflineConfig = {
   // Whose data this is (business:user); set from the session for each request.
@@ -38,9 +39,36 @@ const answer = (config: InternalAxiosRequestConfig, data: unknown, kind: 'cached
   request: {},
 })
 
-// A read slower than this is answered from the device (when it has a copy)
-// while the server's answer still comes in and is kept for next time.
-export const SLOW_READ_MS = 6000
+// With a copy on the device, a read waits this long for the server before the
+// copy is shown; the server's answer still comes in and replaces it. Long
+// enough for a good connection, short enough that a slow one isn't felt.
+export const READ_GRACE_MS = 600
+
+// After a background refresh the copy is as fresh as the server's: reads of
+// it within this window use it without asking the server again.
+const FRESH_MS = 15_000
+const freshUntil = new Map<string, number>()
+
+// Fresh copies arrived in the background: screens re-read theirs. For a
+// moment every read is answered from the device, so that re-read is cheap
+// and never sets off another round of requests.
+const QUIET_MS = 2000
+let quietUntil = 0
+const readListeners = new Set<() => void>()
+let readTimer: ReturnType<typeof setTimeout> | null = null
+const readUpdated = () => {
+  if (readTimer) return
+  readTimer = setTimeout(() => {
+    readTimer = null
+    quietUntil = Date.now() + QUIET_MS
+    readListeners.forEach((l) => l())
+  }, 250)
+}
+// Tell me when kept answers were replaced by newer ones from the server.
+export const subscribeReadUpdates = (l: () => void) => {
+  readListeners.add(l)
+  return () => void readListeners.delete(l)
+}
 
 // How long a write waits for older offline changes to go first.
 const ORDER_WAIT_MS = 3000
@@ -49,7 +77,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const knownOffline = () => getConnection().status === 'offline' || (typeof navigator !== 'undefined' && navigator.onLine === false)
 const browserOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 
-export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_READ_MS): AxiosAdapter => {
+export const withOffline = (base: AxiosAdapter, send: Send, readGraceMs = READ_GRACE_MS): AxiosAdapter => {
   return async (config) => {
     const c = config as InternalAxiosRequestConfig & OfflineConfig
     const scope = c._scope
@@ -57,38 +85,56 @@ export const withOffline = (base: AxiosAdapter, send: Send, slowReadMs = SLOW_RE
     const options = c.offline || undefined
 
     if (methodOf(c) === 'GET') {
-      // Kept current another way: never wait for the network when there's a copy.
-      if (options?.cacheFirst) {
-        const hit = await cachedRead(scope, c)
-        if (hit) return answer(config, hit.body, 'cached', hit.at)
+      // Files (blobs) and sign-in/billing reads always come from the server.
+      if ((c.responseType && c.responseType !== 'json') || cannotKeepRead(c)) return base(config)
+      const key = `${scope}|${readKey(c)}`
+      const hit = await cachedRead(scope, c)
+      // Answer from the device straight away when:
+      //  - it's kept current another way (the menu);
+      //  - we know we're offline;
+      //  - it was just refreshed in the background (no asking twice), or
+      //    screens are re-reading their copies after such a refresh.
+      if (hit && (options?.cacheFirst || knownOffline() || (freshUntil.get(key) ?? 0) > Date.now() || Date.now() < quietUntil)) {
+        return answer(config, hit.body, 'cached', hit.at)
       }
-      // Known to be offline: answer from the device at once, no waiting for a timeout.
-      if (knownOffline()) {
-        const hit = await cachedRead(scope, c)
-        if (hit) return answer(config, hit.body, 'cached', hit.at)
-      }
-      const network = base(config).then((res) => {
+      const network = base(config)
+      // Nothing on this device yet: the first load has to wait for the server
+      // (and is kept, so it never has to again).
+      if (!hit) {
+        const res = await network
         if (res.status >= 200 && res.status < 300) void saveRead(scope, c, res.data)
         return res
-      })
-      try {
-        // Poor connection: don't keep the screen waiting if there's a copy.
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const slow = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), slowReadMs)))
-        const first = await Promise.race([network, slow]).finally(() => clearTimeout(timer))
-        if (first) return first
-        const hit = await cachedRead(scope, c)
-        if (!hit) return await network
-        network.catch(() => undefined)
-        reportReachable(SLOW_MS + 1)
-        return answer(config, hit.body, 'cached', hit.at)
-      } catch (err) {
-        if (!isUnreachableError(err)) throw err
-        const hit = await cachedRead(scope, c)
-        if (!hit) throw err
+      }
+      // A copy is here: wait only a moment for the server. A good connection
+      // answers in time and the screen gets fresh data; a slow one gets the
+      // copy at once, and the server's answer replaces it when it comes.
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const grace = new Promise<'slow'>((resolve) => (timer = setTimeout(() => resolve('slow'), readGraceMs)))
+      const first = await Promise.race([network.then((res) => ({ res }), (err: unknown) => ({ err })), grace]).finally(() =>
+        clearTimeout(timer)
+      )
+      if (first !== 'slow' && 'res' in first) {
+        if (first.res.status >= 200 && first.res.status < 300) void saveRead(scope, c, first.res.data)
+        return first.res
+      }
+      if (first !== 'slow') {
+        if (!isUnreachableError(first.err)) throw first.err
         reportUnreachable()
         return answer(config, hit.body, 'cached', hit.at)
       }
+      reportReachable(SLOW_MS + 1)
+      void network.then(
+        async (res) => {
+          if (res.status < 200 || res.status >= 300) return
+          const changed = await refreshRead(scope, c, hit.body, res.data)
+          freshUntil.set(key, Date.now() + FRESH_MS)
+          if (changed) readUpdated()
+        },
+        (err: unknown) => {
+          if (isUnreachableError(err)) reportUnreachable()
+        }
+      )
+      return answer(config, hit.body, 'cached', hit.at)
     }
 
     const reason = cannotQueue(c)

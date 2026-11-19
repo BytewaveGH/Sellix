@@ -15,6 +15,7 @@ import type { OfflineConfig } from './adapter'
 import { getConnection, useConnection } from '../connection'
 import { discardOp, isSyncing, listOps, retryOp, subscribeOutbox, subscribeSynced, syncOutbox, type Op, type SyncResult } from './engine'
 import type { Query, QueryClient } from '@tanstack/react-query'
+import { subscribeReadUpdates } from './adapter'
 
 // The API lists a query holds (`meta.paths`), if it says.
 const queryPaths = (q: Query) => ((q.meta as { paths?: unknown } | undefined)?.paths as string[] | undefined) ?? []
@@ -152,6 +153,10 @@ export const useOffline = (): OfflineState => {
     void reload()
     return subscribeOutbox(() => void reload())
   }, [reload])
+
+  // Newer data came in the background (the screen showed the saved copy
+  // because the connection was slow): open screens re-read their copies.
+  useEffect(() => subscribeReadUpdates(() => void qc.invalidateQueries({ refetchType: 'active' })), [qc])
 
   // Whatever started a sync: update the screens and say what happened.
   const wasOffline = useRef(false)

@@ -51,7 +51,8 @@ export const receiptData = (order: Order, restaurant: Restaurant, qrSvg = ''): R
       name: l.name,
       quantity: l.quantity,
       details: [l.summary, l.note ? `“${l.note}”` : ''].filter(Boolean),
-      ...(l.quantity > 1 ? { unitPrice: m(l.unitPrice) } : {}),
+      // "4 × ₵5" would not add up to the total when an extra is charged once.
+      ...(l.quantity > 1 && !l.onceExtras ? { unitPrice: m(l.unitPrice) } : {}),
       total: m(l.lineTotal),
     })),
     totals: [

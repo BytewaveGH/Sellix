@@ -10,6 +10,8 @@ vi.mock('next-intl', () => ({ useTranslations: () => (k: string) => k }))
 vi.mock('@/lib/tenant', async (orig) => ({
   ...(await orig<typeof import('@/lib/tenant')>()),
   classifyHost: () => ({ kind: 'tenant', slug: 'kofi-mart' }),
+  // What the form asks for this site's business (the subdomain, or the desktop app's).
+  clientTenantSlug: () => 'kofi-mart',
 }))
 
 import SignInForm from '@/components/generals/authentication/widgets/forms/sign-in'

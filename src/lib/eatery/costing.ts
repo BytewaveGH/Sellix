@@ -116,15 +116,19 @@ const addTo = (m: Map<number, number>, lines: RecipeLine[] | undefined, times: n
 }
 
 // Ingredients one order line uses: the item's recipe, the recipes of the
-// options chosen, and for combos the recipe of every item picked.
+// options chosen, and for combos the recipe of every item picked. Extras in
+// `onceGroups` (charged once per line, see menu.onceGroupIds) are used once,
+// not once per portion: TZ × 4 with one fish uses one fish.
 export const lineUsage = (
   line: Pick<OrderLineInput, 'itemId' | 'quantity' | 'choices' | 'comboPicks'>,
-  recipeByItem: Map<number, Recipe>
+  recipeByItem: Map<number, Recipe>,
+  onceGroups: ReadonlySet<string> = new Set()
 ) => {
   const m = new Map<number, number>()
   const r = recipeByItem.get(line.itemId)
   addTo(m, r?.ingredients, line.quantity)
-  for (const ids of Object.values(line.choices ?? {})) for (const id of ids) addTo(m, r?.choices[id], line.quantity)
+  for (const [groupId, ids] of Object.entries(line.choices ?? {}))
+    for (const id of ids) addTo(m, r?.choices[id], onceGroups.has(groupId) ? 1 : line.quantity)
   for (const picked of Object.values(line.comboPicks ?? {})) addTo(m, recipeByItem.get(picked)?.ingredients, line.quantity)
   return m
 }

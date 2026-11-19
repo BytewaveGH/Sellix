@@ -40,6 +40,35 @@ export function classifyHost(host: string | null | undefined): HostClassificatio
   return { kind: 'unknown', slug: null }
 }
 
+// ── The Windows desktop app ─────────────────────────────────────────────────
+// Each desktop install (desktop/) is set up for one business, and runs on
+// localhost where there's no subdomain. Electron passes that business to its
+// local server as SELLIX_DESKTOP_BUSINESS, and the page carries it in a
+// <meta name="sellix-business"> tag. Both stand in for the subdomain only when
+// the address names none, and neither is ever set on the web.
+
+export const DESKTOP_BUSINESS_META = 'sellix-business'
+
+const validSlug = (value: unknown): string | null =>
+  typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null
+
+// Server side: the desktop's business, or null.
+export const desktopBusiness = (env: Record<string, string | undefined> = process.env): string | null =>
+  validSlug(env.SELLIX_DESKTOP_BUSINESS)
+
+// Server side: the business this request is for — the subdomain, else the desktop's.
+export function hostTenantSlug(host: string | null | undefined, env?: Record<string, string | undefined>): string | null {
+  return classifyHost(host).slug ?? desktopBusiness(env)
+}
+
+// In the browser: the same, from the address or the page's meta tag.
+export function clientTenantSlug(): string | null {
+  if (typeof window === 'undefined') return null
+  const fromHost = classifyHost(window.location.host).slug
+  if (fromHost) return fromHost
+  return validSlug(document.querySelector(`meta[name="${DESKTOP_BUSINESS_META}"]`)?.getAttribute('content'))
+}
+
 export function slugify(input: string): string {
   return input
     .trim()

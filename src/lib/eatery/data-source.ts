@@ -12,7 +12,7 @@
 import type { AxiosRequestConfig } from 'axios'
 import { averageCost, lineUsage, packagingUsage, usageCost } from './costing'
 import { blobToDataUrl, type ImageKind } from './images'
-import { openState, priceOrder } from './menu'
+import { onceGroupIds, openState, priceOrder } from './menu'
 import { presetFor } from './presets'
 import { DEMO_RESTAURANTS, templateGroup, type DemoRestaurant } from './seed'
 import type {
@@ -412,10 +412,13 @@ export const createLocalSource = (
     const ings = read('ingredients')
     const byId = new Map(ings.map((i) => [i.id, i]))
     const total = new Map<number, number>()
+    const itemById = new Map(read('items').map((i) => [i.id, i]))
     const lines = order.lines.map((l) => {
-      const per = lineUsage({ ...l, quantity: 1 }, recipes)
-      per.forEach((q, id) => total.set(id, (total.get(id) ?? 0) + q * l.quantity))
-      return { ...l, unitCost: usageCost(per, byId) }
+      // Extras charged once per line are used once, so the cost per portion
+      // is the line's cost shared over its portions.
+      const used = lineUsage(l, recipes, onceGroupIds(itemById.get(l.itemId)))
+      used.forEach((q, id) => total.set(id, (total.get(id) ?? 0) + q))
+      return { ...l, unitCost: round4(usageCost(used, byId) / Math.max(1, l.quantity)) }
     })
     // Tissue, boxes, bags… from packaging rules: counted on the order, not a line.
     const packaging = packagingUsage(

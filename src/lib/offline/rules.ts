@@ -56,12 +56,18 @@ const isBinary = (data: unknown) =>
   (typeof Blob !== 'undefined' && data instanceof Blob) ||
   (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer)
 
+// Reads that always come from the server: signing in, public pages, platform
+// admin, billing.
+export const cannotKeepRead = (r: RequestLike) => ONLINE_ONLY.test(pathOf(r))
+
 // Why a write can't wait for the connection, or null if it can.
 export const cannotQueue = (r: RequestLike): string | null => {
   const path = pathOf(r)
   if (ONLINE_ONLY.test(path)) return 'This needs the internet.'
   if (isBinary(r.data)) return 'Photos and files need the internet to upload.'
   if (/(^|\/)(uploads?|files?|images?|photos?|documents\/upload)(\/|$)/.test(path)) return 'Photos and files need the internet to upload.'
+  // A link someone else will open has to come from the server.
+  if (/(^|\/)share-link(\/|$)/.test(path)) return 'Sharing a link needs the internet.'
   return null
 }
 

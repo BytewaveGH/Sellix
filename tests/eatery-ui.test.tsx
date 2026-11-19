@@ -371,6 +371,39 @@ describe('eatery platform (local data)', () => {
     expect(bundle.items.find((i) => i.name === 'Mango Cheesecake')?.imageUrl).toMatch(/^data:image/)
   })
 
+  it('an extras group can be charged once per line (TZ × 4 with one fish)', async () => {
+    const owner = createLocalSource('acme')
+    const mine = await owner.claimDemo!()
+    const cafe = mine.find((r) => r.slug === 'kofi-and-crumb')!
+    const categories = (await owner.list('categories')).filter((c) => c.restaurantId === cafe.id)
+    const items = (await owner.list('items')).filter((i) => i.restaurantId === cafe.id)
+    withQuery(<ItemForm open onOpenChange={() => {}} restaurant={cafe} categories={categories} items={items} item={null} />)
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'TZ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Custom group' }))
+    fireEvent.change(screen.getByLabelText('Option group name'), { target: { value: 'Size' } })
+    fireEvent.change(screen.getByLabelText('Choice name'), { target: { value: 'Regular' } })
+    fireEvent.change(screen.getByLabelText('Regular price'), { target: { value: '5' } })
+    // Pick-one groups don't offer the setting.
+    expect(screen.queryByRole('radio', { name: 'Charged once per line' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Custom group' }))
+    fireEvent.change(screen.getAllByLabelText('Option group name')[1], { target: { value: 'Proteins' } })
+    fireEvent.click(screen.getAllByRole('radio', { name: 'Extras (toppings…)' })[1])
+    fireEvent.change(screen.getAllByLabelText('Choice name')[1], { target: { value: 'Fish small' } })
+    fireEvent.change(screen.getByLabelText('Fish small price change'), { target: { value: '20' } })
+    expect(screen.getByRole('radio', { name: 'Charged for every portion' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Charged once per line' }))
+    expect(screen.getByText(/the extra once/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to menu' }))
+    await waitFor(async () => {
+      const saved = (await owner.list('items')).find((i) => i.name === 'TZ')!
+      expect(saved.optionGroups[1]).toMatchObject({ name: 'Proteins', kind: 'addon', chargeOnce: true })
+      expect(saved.optionGroups[0].chargeOnce).toBeUndefined()
+    })
+  })
+
   it('prices an item by its choices (ice cream flavours) and preselects the first', async () => {
     const owner = createLocalSource('acme')
     const mine = await owner.claimDemo!()

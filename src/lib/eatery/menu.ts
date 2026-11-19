@@ -7,6 +7,7 @@ import type {
   FulfilmentType,
   MenuCategory,
   MenuItem,
+  OptionGroup,
   OrderLine,
   OrderLineInput,
   Promotion,
@@ -166,8 +167,24 @@ export interface LinePrice {
   base: number
   discountPerUnit: number
   unitPrice: number
+  // Extras charged once for the whole line (see OptionGroup.chargeOnce):
+  // before the promotion, the promotion's share, and what's charged.
+  onceBase: number
+  onceDiscount: number
+  onceExtras: number
   promotion?: Promotion
 }
+
+// Extras groups charged once per line rather than per portion.
+export const chargedOnce = (g: OptionGroup) => g.kind === 'addon' && !!g.chargeOnce
+
+// Ids of an item's groups charged once per line (for ingredient use).
+export const onceGroupIds = (item: MenuItem | undefined) =>
+  new Set((item?.optionGroups ?? []).filter(chargedOnce).map((g) => g.id))
+
+// What a line costs: unitPrice × quantity + onceExtras.
+export const lineAmount = (price: Pick<LinePrice, 'unitPrice' | 'onceExtras'>, quantity: number) =>
+  round2(price.unitPrice * quantity + price.onceExtras)
 
 export const linePrice = (
   item: MenuItem,
@@ -177,15 +194,40 @@ export const linePrice = (
   now: Date
 ): LinePrice => {
   let base = item.price
-  for (const g of item.optionGroups) for (const id of choices[g.id] ?? []) base += g.choices.find((c) => c.id === id)?.priceDelta ?? 0
+  let onceBase = 0
+  for (const g of item.optionGroups) {
+    for (const id of choices[g.id] ?? []) {
+      const delta = g.choices.find((c) => c.id === id)?.priceDelta ?? 0
+      if (chargedOnce(g)) onceBase += delta
+      else base += delta
+    }
+  }
   for (const s of item.combo?.slots ?? []) base += s.choices.find((c) => c.itemId === comboPicks?.[s.id])?.upcharge ?? 0
   base = Math.max(0, round2(base))
+  onceBase = Math.max(0, round2(onceBase))
   const promotion = bestPromotion(item, promotions, now)
-  const discountPerUnit = promotion ? round2((base * promotion.percentOff) / 100) : 0
-  return { base, discountPerUnit, unitPrice: round2(base - discountPerUnit), promotion }
+  const off = (n: number) => (promotion ? round2((n * promotion.percentOff) / 100) : 0)
+  const discountPerUnit = off(base)
+  const onceDiscount = off(onceBase)
+  return {
+    base,
+    discountPerUnit,
+    unitPrice: round2(base - discountPerUnit),
+    onceBase,
+    onceDiscount,
+    onceExtras: round2(onceBase - onceDiscount),
+    promotion,
+  }
 }
 
-export const choiceSummary = (item: MenuItem, line: Pick<OrderLineInput, 'choices' | 'comboPicks'>, itemsById?: Map<number, MenuItem>) => {
+// "Regular · + Fish small". With more than one portion, extras charged once
+// for the line say so ("+ Fish small (once)"), so the kitchen makes one and
+// the receipt adds up.
+export const choiceSummary = (
+  item: MenuItem,
+  line: Pick<OrderLineInput, 'choices' | 'comboPicks'> & { quantity?: number },
+  itemsById?: Map<number, MenuItem>
+) => {
   const parts: string[] = []
   for (const s of item.combo?.slots ?? []) {
     const picked = line.comboPicks?.[s.id]
@@ -194,7 +236,8 @@ export const choiceSummary = (item: MenuItem, line: Pick<OrderLineInput, 'choice
   for (const g of item.optionGroups) {
     const names = (line.choices[g.id] ?? []).map((id) => g.choices.find((c) => c.id === id)?.name).filter(Boolean) as string[]
     if (!names.length) continue
-    parts.push(g.kind === 'addon' ? `+ ${names.join(', ')}` : names.join(', '))
+    const once = chargedOnce(g) && (line.quantity ?? 1) > 1 ? ' (once)' : ''
+    parts.push(g.kind === 'addon' ? `+ ${names.join(', ')}${once}` : names.join(', '))
   }
   return parts.join(' · ')
 }
@@ -222,6 +265,8 @@ export const priceOrder = (
   const categoryById = new Map(bundle.categories.map((c) => [c.id, c]))
   const problems: string[] = []
   const lines: OrderLine[] = []
+  let gross = 0
+  let discount = 0
   for (const l of input) {
     const item = itemsById.get(l.itemId)
     if (!item) {
@@ -238,14 +283,17 @@ export const priceOrder = (
       ...l,
       quantity,
       name: item.name,
-      summary: choiceSummary(item, l, itemsById),
+      summary: choiceSummary(item, { ...l, quantity }, itemsById),
       unitPrice: price.unitPrice,
       discountPerUnit: price.discountPerUnit,
-      lineTotal: round2(price.unitPrice * quantity),
+      ...(price.onceBase > 0 ? { onceExtras: price.onceExtras } : {}),
+      lineTotal: lineAmount(price, quantity),
     })
+    gross += price.base * quantity + price.onceBase
+    discount += price.discountPerUnit * quantity + price.onceDiscount
   }
-  const gross = round2(lines.reduce((s, l) => s + (l.unitPrice + l.discountPerUnit) * l.quantity, 0))
-  const discount = round2(lines.reduce((s, l) => s + l.discountPerUnit * l.quantity, 0))
+  gross = round2(gross)
+  discount = round2(discount)
   const subtotal = round2(gross - discount)
   const delivery = restaurant.fulfilment.delivery
   const deliveryFee = fulfilment === 'delivery' ? delivery.fee : 0

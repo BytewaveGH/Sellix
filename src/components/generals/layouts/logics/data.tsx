@@ -29,6 +29,9 @@ import {
   Receipt,
   Gem,
   CircleUser,
+  DoorOpen,
+  PartyPopper,
+  TicketPlus,
 } from 'lucide-react'
 import { ITopNavItems } from './interface'
 
@@ -79,19 +82,25 @@ const amusementSidebarItems = [
   },
   {
     title: 'Ticketing',
-    items: [{ label: 'Tickets', href: '/en/amusement/tickets', icon: Ticket, requiredPermission: 'canManageSales' }],
+    items: [
+      { label: 'Ticket counter', href: '/en/amusement/counter', icon: TicketPlus, requiredPermission: 'canManageSales' },
+      { label: 'Gate check-in', href: '/en/amusement/gate', icon: DoorOpen, requiredPermission: 'canManageSales' },
+      { label: 'All tickets', href: '/en/amusement/tickets', icon: Ticket, requiredPermission: 'canManageSales' },
+    ],
   },
   {
     title: 'Park',
-    items: [{ label: 'Attractions', href: '/en/amusement/attractions', icon: Compass, requiredPermission: 'canManageProducts' }],
+    items: [
+      { label: 'Attractions', href: '/en/amusement/attractions', icon: Compass, requiredPermission: 'canManageProducts' },
+      { label: 'Bookings', href: '/en/amusement/bookings', icon: CalendarCheck, requiredPermission: 'canManageSales' },
+    ],
   },
   {
-    title: 'Reservations',
-    items: [{ label: 'Bookings', href: '/en/amusement/bookings', icon: CalendarCheck, requiredPermission: 'canManageSales' }],
-  },
-  {
-    title: 'Leaderboard',
-    items: [{ label: 'Leaderboard', href: '/en/amusement/leaderboard', icon: Trophy, requiredPermission: 'canManageSales' }],
+    title: 'Games & fun',
+    items: [
+      { label: 'Leaderboard', href: '/en/amusement/leaderboard', icon: Trophy, requiredPermission: 'canManageSales' },
+      { label: 'Prize wheel', href: '/en/amusement/wheel', icon: PartyPopper, requiredPermission: 'canManageSales' },
+    ],
   },
 ]
 
