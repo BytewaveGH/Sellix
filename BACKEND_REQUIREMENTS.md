@@ -383,7 +383,7 @@ Same four routes per resource as §6.2 (`GET /`, `POST /`, `PUT /:id`, `DELETE /
 
   The server prices every line from the current menu, in the restaurant's local time:
 
-  - Unit price = item price + each chosen option's `priceDelta` + each combo pick's `upcharge`.
+  - Unit price = item price + each chosen option's `priceDelta` + each combo pick's `upcharge`, except options in an extras group with `chargeOnce: true` (§7.6). Those are added once to the line, not once per unit.
   - Then the single best **live** promotion covering the item (by item or category, or the whole menu when both lists are empty) takes `percentOff`.
   - Delivery adds `fulfilment.delivery.fee`.
   - It returns the `Order` plus a one-time `accessKey`, which is a random secret of at least 16 characters.
@@ -509,6 +509,29 @@ Expense    { id, restaurantId, category, amount, date, note? }
 - Net profit: gross profit − waste moves' cost − expenses.
 
 Purchases are money out, not a cost, until the stock is used or wasted.
+
+### 7.6 Extras charged once per line (change needed)
+
+Chop bars sell "TZ for ₵20" (Regular ₵5 × 4) with **one** fish (₵20) on top. Today an extra is charged for every unit, so the line comes to (5 + 20) × 4 = ₵100 instead of 5 × 4 + 20 = ₵40. Owners can now mark an extras group (`kind: "addon"`) as charged once per line. The new field is on the option group, stored inside `optionGroups` JSON as usual:
+
+```
+{ "id": "protein", "name": "Proteins", "kind": "addon", "min": 0, "max": 3, "chargeOnce": true, "choices": [...] }
+```
+
+Missing or `false` means the current behaviour, so existing menus are unchanged. Ignore it on `kind: "variant"` groups.
+
+**Order pricing** (`storefront.go`, and counter orders), per line:
+
+- `unitPrice` = item price + `priceDelta` of chosen options in groups **without** `chargeOnce` + combo `upcharge`s, minus the promotion's `percentOff`. As today.
+- `onceExtras` = sum of `priceDelta` of chosen options in groups **with** `chargeOnce`, minus the same `percentOff`. Store it on the line; omit it (or 0) when there are none.
+- `lineTotal` = `unitPrice × quantity + onceExtras`.
+- Order subtotal and discount: add each line's `onceExtras` (before and after the promotion) once, not × quantity.
+
+**Stock (§7.5):** an option's recipe in a `chargeOnce` group is used once per line, not × quantity. Store `unitCost` as the line's ingredient cost ÷ quantity, so `unitCost × quantity` stays the line's cost.
+
+**Offline counter orders (§13, `/eatery/sync/orders`):** each line now carries `onceExtras` beside `unitPrice` when it has once-charged extras. Keep both as paid; the price-mismatch tolerance applies to `unitPrice × quantity + onceExtras`.
+
+The frontend rules are in `src/lib/eatery/menu.ts` (`linePrice`, `priceOrder`) and `costing.ts` (`lineUsage`), with tests in `tests/eatery-charge-once.test.ts`. Until this is live, tills on the API data source will show ₵40 but the server will record ₵100 for such lines, so don't switch the setting on for a live restaurant before then.
 
 ### 7.4 Later
 
@@ -1043,7 +1066,7 @@ The **park name**, the **general admission price** (tickets with no attraction),
 2. `appType` on login responses (§2) — small addition, unblocks correct per-vertical routing for every real tenant (currently everyone defaults to "retail").
 3. Platform-level stats/employees (§3) — lower priority, purely additive to the super admin dashboard; the mock data is clearly labeled as such and isn't blocking anything else.
 4. Real estate vertical (§6) — frontend is live on browser-only storage; these endpoints make it multi-device and durable.
-5. Eatery platform (§7) — owner dashboard and public storefronts are live on browser-only storage; customers' orders only reach the owner once these exist.
+5. Eatery platform (§7) — owner dashboard and public storefronts are live on browser-only storage; customers' orders only reach the owner once these exist. §7.6 (extras charged once per line) is needed before owners turn that setting on for a live restaurant.
 6. Subscriptions and billing (§8) — plans, payments and gating work today on a server-side JSON file. These endpoints make billing durable, and §8.4 makes access limits enforceable instead of only shown in the UI.
 7. Store stats fixes (§9) — §9.1 (cost of goods per unit) first: until then any piece or pack sold under the flat/wholesale rule is costed as a whole box, so those products show a loss. §9.4–9.5 make daily cash/MoMo reconciliation exact.
 8. Accounts and team (§10) — §10.3's `PUT /auth/reset-password/:id` lockdown first (security). Then owner change/forgot password (§10.3), staff change password (§10.1) and suspend (§10.2).

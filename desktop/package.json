@@ -27,6 +27,7 @@
       "main.js",
       "server.js",
       "business.js",
+      "last-page.js",
       "loading.html",
       "setup.html",
       "setup.js",

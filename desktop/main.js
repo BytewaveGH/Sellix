@@ -12,11 +12,14 @@ const path = require('node:path')
 const { app, BrowserWindow, dialog, shell, session, Menu, ipcMain } = require('electron')
 const { startServer, appDir, ORIGIN } = require('./server')
 const { readBusiness, saveBusiness, lookUp, ownerApproves } = require('./business')
+const { rememberPage, lastPage, forgetPage } = require('./last-page')
 
 let server = null
 let win = null
 let business = null
 let quitting = false
+// Set once the person confirms closing, or when the app quits on its own.
+let closeConfirmed = false
 let booting = true
 
 // One copy per PC: a second would fight over the port and the stored data.
@@ -165,6 +168,41 @@ function createWindow() {
     openOutside(url)
   })
 
+  // Remember where the till is, so reopening goes back there. The sign-in
+  // cookie is written to disk straight away too, so a power cut right after
+  // signing in doesn't lose it (Chromium otherwise saves it every ~30 s).
+  const remember = (_event, url) => {
+    if (!business) return
+    rememberPage(url, ORIGIN, business.slug)
+    session.defaultSession.cookies.flushStore().catch(() => {})
+  }
+  win.webContents.on('did-navigate', remember)
+  win.webContents.on('did-navigate-in-page', remember)
+
+  // Closing the till by mistake (the X, Alt+F4, the menu's Quit) asks first.
+  // Quits the app itself starts (a crash, Windows shutting down) don't.
+  win.on('close', (event) => {
+    if (closeConfirmed) return
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'question',
+      title: 'Close Sellix POS?',
+      message: 'Close Sellix POS?',
+      detail:
+        'You stay signed in, and the app opens on this screen next time.\n\nSales not sent yet are kept on this PC and go up the next time the app is open with internet.',
+      buttons: ['Close', 'Keep open'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    })
+    if (choice === 0) closeConfirmed = true
+    else event.preventDefault()
+  })
+  const closingForWindows = () => {
+    closeConfirmed = true
+  }
+  win.on('query-session-end', closingForWindows)
+  win.on('session-end', closingForWindows)
+
   win.on('closed', () => {
     win = null
   })
@@ -200,7 +238,8 @@ function setMenu() {
         { label: 'Reload', accelerator: 'F5', click: () => win?.webContents.reload() },
         { label: 'Open log folder', click: () => shell.openPath(logDir) },
         { type: 'separator' },
-        { label: 'Quit Sellix POS', role: 'quit' },
+        // Closes the window, which asks first (see createWindow).
+        { label: 'Quit Sellix POS', click: () => (win ? win.close() : app.quit()) },
       ],
     },
   ])
@@ -242,7 +281,9 @@ async function launch() {
       .finally(() => app.quit())
   })
 
-  await win.loadURL(`${started.url}/`)
+  // Back to the screen the till was on. Still signed in → that screen; signed
+  // out → the web app sends it to sign-in as usual.
+  await win.loadURL(`${started.url}${lastPage(ORIGIN, business.slug) ?? '/'}`)
 }
 
 async function changeBusiness() {
@@ -258,6 +299,7 @@ async function changeBusiness() {
   // Sign everyone out: a session belongs to the old business. Cached data and
   // unsent sales stay, kept per business, and go up when that business signs in again.
   await session.defaultSession.clearStorageData({ origin: ORIGIN, storages: ['cookies'] })
+  forgetPage()
   await launch()
 }
 
@@ -274,6 +316,9 @@ async function boot() {
 }
 
 app.on('before-quit', () => {
+  // The app is quitting on purpose (after a confirmed close, a crash or a
+  // failed start): close the window without asking again.
+  closeConfirmed = true
   quitting = true
   server?.stop()
 })

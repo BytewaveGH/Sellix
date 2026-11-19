@@ -286,7 +286,9 @@ const OptionGroupEditor = ({
             onChange({
               ...group,
               kind,
-              ...(kind === 'variant' ? { min: 1, max: 1 } : { min: 0, max: Math.max(1, Math.min(group.choices.length, 3)) }),
+              ...(kind === 'variant'
+                ? { min: 1, max: 1, chargeOnce: undefined }
+                : { min: 0, max: Math.max(1, Math.min(group.choices.length, 3)) }),
             })
           }
           options={[
@@ -317,6 +319,24 @@ const OptionGroupEditor = ({
           </>
         )}
       </div>
+      {!single && (
+        <div className="mt-2">
+          <Segmented
+            ariaLabel={`${group.name || 'Group'} charged`}
+            value={group.chargeOnce ? 'once' : 'each'}
+            onChange={(v) => onChange({ ...group, chargeOnce: v === 'once' ? true : undefined })}
+            options={[
+              { value: 'each', label: 'Charged for every portion' },
+              { value: 'once', label: 'Charged once per line' },
+            ]}
+          />
+          <p className="mt-1 text-[11px] text-stone-500">
+            {group.chargeOnce
+              ? 'Quantity 4 with one extra: the item is charged 4 times, the extra once (e.g. TZ × 4 + one fish).'
+              : 'Quantity 4 with one extra: the item and the extra are both charged 4 times (e.g. 4 pizzas, each with cheese).'}
+          </p>
+        </div>
+      )}
       {pricing && onPricing && (
         <div className="mt-2">
           <Segmented

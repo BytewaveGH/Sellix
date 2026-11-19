@@ -68,15 +68,17 @@ export const offlineCounterOrder = (
 
 // What's sent for a counter order kept offline: the order as rung up (with
 // its clientId and till fields) plus, per line, the price the customer paid
-// (after promotions), which the server keeps.
+// (after promotions), which the server keeps: unitPrice per portion, and
+// onceExtras for extras charged once for the line.
 export const offlineOrderBody = (menu: MenuOnDevice, input: CounterOrderInput, now: Date) => {
   const b = bundle(menu)
   return {
     ...input,
     restaurantId: menu.restaurant.id,
     lines: input.lines.map((l) => {
-      const price = priceOrder(b, [l], null, now).lines[0]?.unitPrice
-      return price === undefined ? l : { ...l, unitPrice: price }
+      const priced = priceOrder(b, [l], null, now).lines[0]
+      if (!priced) return l
+      return { ...l, unitPrice: priced.unitPrice, ...(priced.onceExtras !== undefined ? { onceExtras: priced.onceExtras } : {}) }
     }),
   }
 }

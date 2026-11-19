@@ -109,6 +109,10 @@ export interface OptionGroup {
   min: number
   max: number
   choices: OptionChoice[]
+  // Extras only. true: each chosen extra is charged once for the whole line,
+  // whatever the quantity (TZ × 4 + one fish = 4 × TZ + 1 fish). Absent or
+  // false: charged for every portion, as before.
+  chargeOnce?: boolean
 }
 
 // A combo: fixed price, the customer picks one item per slot (main, side, drink).
@@ -177,6 +181,9 @@ export interface OrderLine extends OrderLineInput {
   unitPrice: number
   // Promotion discount per unit included in unitPrice.
   discountPerUnit: number
+  // Extras charged once for the line (groups with chargeOnce), after the
+  // promotion. lineTotal = unitPrice × quantity + onceExtras.
+  onceExtras?: number
   lineTotal: number
   // Ingredient cost per unit, worked out when stock was deducted (owner-only).
   unitCost?: number
