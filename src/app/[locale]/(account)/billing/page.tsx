@@ -17,11 +17,13 @@ import { EmployeeServices } from '@/lib/account'
 import type { IGeneric } from '@/types/interfaces'
 import { BillingPill, METHOD_LABELS, PeriodBar, accessLine, shortDate } from '@/components/billing/bits'
 import { HowToPay } from '@/components/billing/gate'
+import { UsageBillCard, UsageRates } from '@/components/billing/usage'
+import { isUsagePlan } from '@/lib/subscription/usage'
 
 export default function BillingPage() {
   const { data: session, status } = useSession()
   const billing = useBilling()
-  const { access, subscription: sub, catalog } = billing
+  const { access, subscription: sub, catalog, usage } = billing
   const request = useBillingRequest()
   const appType = session?.user?.appType ?? 'retail'
   const moduleFeatures = featuresFor(appType)
@@ -64,7 +66,12 @@ export default function BillingPage() {
   const sendRequest = async () => {
     if (!asking) return
     try {
-      await request.mutateAsync({ type: 'request-plan', planId: asking.id, cycle, note: note.trim() || undefined })
+      await request.mutateAsync({
+        type: 'request-plan',
+        planId: asking.id,
+        cycle: isUsagePlan(asking) ? 'monthly' : cycle,
+        note: note.trim() || undefined,
+      })
       toast.success(`Request for ${asking.name} sent`)
       setAsking(null)
       setNote('')
@@ -92,12 +99,37 @@ export default function BillingPage() {
                   </div>
                   <p className="text-sm text-stone-500 mt-1">{accessLine(access, sub)}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-extrabold text-stone-900 tabular-nums">{cedis(priceFor(access.plan, sub.cycle))}</p>
-                  <p className="text-xs text-stone-500">per {cycleLabel(sub.cycle)}</p>
-                </div>
+                {isUsagePlan(access.plan) ? (
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-stone-900">No monthly price</p>
+                    <p className="text-xs text-stone-500">Service fee on sales, billed monthly</p>
+                  </div>
+                ) : (
+                  <div className="text-right">
+                    <p className="text-2xl font-extrabold text-stone-900 tabular-nums">{cedis(priceFor(access.plan, sub.cycle))}</p>
+                    <p className="text-xs text-stone-500">per {cycleLabel(sub.cycle)}</p>
+                  </div>
+                )}
               </div>
               <PeriodBar sub={sub} access={access} className="mt-5" />
+              {isUsagePlan(access.plan) && (
+                <div className="mt-5 grid gap-4 md:grid-cols-[1fr_260px]">
+                  <UsageBillCard
+                    pricing={access.plan.usage}
+                    report={usage}
+                    periodStart={sub.currentPeriodStart}
+                    periodEnd={access.endsAt?.toISOString() ?? null}
+                    audience="owner"
+                  />
+                  <div>
+                    <p className="text-xs font-semibold text-stone-500 mb-2">Your rates</p>
+                    <UsageRates pricing={access.plan.usage} module={appType} />
+                    {appType === 'retail' && (
+                      <p className="mt-2 text-[11px] text-stone-400">Set each product’s fee type when you add or edit it.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex items-start gap-4">
@@ -178,8 +210,10 @@ export default function BillingPage() {
         </div>
         <div className={cn('grid gap-4', plans.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
           {plans.map((p) => {
-            const current = p.id === sub?.planId && cycle === sub?.cycle
-            const requested = sub?.request?.planId === p.id && sub.request.cycle === cycle
+            // Pay as you sell has no yearly option: it's the same plan in either view.
+            const planCycle = isUsagePlan(p) ? 'monthly' : cycle
+            const current = p.id === sub?.planId && planCycle === sub?.cycle
+            const requested = sub?.request?.planId === p.id && sub.request.cycle === planCycle
             return (
               <Card
                 key={p.id}
@@ -193,15 +227,31 @@ export default function BillingPage() {
                 )}
                 <p className="text-base font-extrabold text-stone-900">{p.name}</p>
                 <p className="text-xs text-stone-500 mt-0.5 min-h-[2rem]">{p.tagline}</p>
-                <p className="mt-3">
-                  <span className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">{cedis(priceFor(p, cycle))}</span>
-                  <span className="text-sm text-stone-500"> /{cycleLabel(cycle)}</span>
-                </p>
-                <p className="text-[11px] text-stone-400 h-4">
-                  {cycle === 'yearly' && p.monthlyPrice > 0
-                    ? `${cedis(Math.round(monthlyEquivalent(p, 'yearly')))}/month, billed yearly`
-                    : ''}
-                </p>
+                {isUsagePlan(p) ? (
+                  <>
+                    <p className="mt-3">
+                      <span className="text-3xl font-extrabold tracking-tight text-stone-900">₵0</span>
+                      <span className="text-sm text-stone-500"> + fee on sales</span>
+                    </p>
+                    <p className="text-[11px] text-stone-400 h-4">
+                      Billed monthly · {cedis(p.usage.minimum)} minimum
+                      {p.usage.cap !== null ? `, ${cedis(p.usage.cap)} cap` : ''}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-3">
+                      <span className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">{cedis(priceFor(p, cycle))}</span>
+                      <span className="text-sm text-stone-500"> /{cycleLabel(cycle)}</span>
+                    </p>
+                    <p className="text-[11px] text-stone-400 h-4">
+                      {cycle === 'yearly' && p.monthlyPrice > 0
+                        ? `${cedis(Math.round(monthlyEquivalent(p, 'yearly')))}/month, billed yearly`
+                        : ''}
+                    </p>
+                  </>
+                )}
+                {isUsagePlan(p) && <UsageRates pricing={p.usage} module={appType} className="mt-4 rounded-xl bg-stone-50 p-3" />}
                 <ul className="mt-4 flex flex-col gap-2 text-sm flex-1">
                   <li className="flex items-center gap-2 text-stone-700">
                     <Check className="h-4 w-4 text-emerald-600 flex-shrink-0" />
@@ -314,22 +364,41 @@ export default function BillingPage() {
             <div className="rounded-2xl border border-stone-200 p-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-stone-900">{asking.name}</p>
-                <p className="text-xs text-stone-500">Billed {cycle}</p>
+                <p className="text-xs text-stone-500">{isUsagePlan(asking) ? 'Billed monthly, after the month' : `Billed ${cycle}`}</p>
               </div>
-              <p className="text-lg font-extrabold text-stone-900 tabular-nums">
-                {cedis(priceFor(asking, cycle))}
-                <span className="text-xs font-semibold text-stone-500"> /{cycleLabel(cycle)}</span>
-              </p>
+              {isUsagePlan(asking) ? (
+                <p className="text-sm font-bold text-stone-900 text-right">
+                  Fee on sales
+                  <span className="block text-xs font-semibold text-stone-500">
+                    {cedis(asking.usage.minimum)} minimum{asking.usage.cap !== null ? ` · ${cedis(asking.usage.cap)} cap` : ''}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-lg font-extrabold text-stone-900 tabular-nums">
+                  {cedis(priceFor(asking, cycle))}
+                  <span className="text-xs font-semibold text-stone-500"> /{cycleLabel(cycle)}</span>
+                </p>
+              )}
             </div>
-            <Segmented
-              ariaLabel="Billing cycle for the request"
-              value={cycle}
-              onChange={setCycle}
-              options={[
-                { value: 'monthly', label: 'Monthly' },
-                { value: 'yearly', label: 'Yearly' },
-              ]}
-            />
+            {isUsagePlan(asking) ? (
+              <div className="rounded-2xl border border-stone-200 p-4">
+                <p className="text-xs font-semibold text-stone-500 mb-2">What you’d pay on sales</p>
+                <UsageRates pricing={asking.usage} module={appType} />
+                <p className="mt-3 text-[11px] text-stone-400">
+                  Every feature and unlimited staff. Cancelled and refunded sales, delivery fees and VAT aren’t charged.
+                </p>
+              </div>
+            ) : (
+              <Segmented
+                ariaLabel="Billing cycle for the request"
+                value={cycle}
+                onChange={setCycle}
+                options={[
+                  { value: 'monthly', label: 'Monthly' },
+                  { value: 'yearly', label: 'Yearly' },
+                ]}
+              />
+            )}
             <Field label="Note (optional)" hint="Anything the team should know, e.g. when you’ll pay." htmlFor="plan-note">
               <Textarea id="plan-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
             </Field>

@@ -168,7 +168,7 @@ describe('actions', () => {
 
 describe('catalog', () => {
   it('validates edits and blocks deleting a plan businesses are on', () => {
-    expect(parseCatalog(catalog).plans).toHaveLength(3)
+    expect(parseCatalog(catalog).plans).toHaveLength(4)
     expect(() => parseCatalog({ ...catalog, plans: [...catalog.plans, catalog.plans[0]] })).toThrow(/share an id/)
     expect(() => parseCatalog({ ...catalog, plans: [{ ...catalog.plans[0], features: ['retail.nope'] }] })).toThrow()
     expect(() => parseCatalog({ ...catalog, plans: catalog.plans.map((p) => ({ ...p, archived: true })) })).toThrow(/on offer/)
@@ -204,7 +204,7 @@ describe('console insights', () => {
     expect(a.requests.map((r) => r.tenant.id)).toEqual([4])
     expect(a.pastDue.map((r) => r.tenant.id).sort()).toEqual([1, 4])
     expect(a.trialsEnding.map((r) => r.tenant.id)).toEqual([3])
-    expect(planDistribution(rows, catalog).map((d) => d.count)).toEqual([0, 3, 1])
+    expect(planDistribution(rows, catalog).map((d) => d.count)).toEqual([0, 3, 1, 0])
   })
 })
 
@@ -223,7 +223,7 @@ describe('file store', () => {
   it('persists actions in order, guards the catalog, and resolves an owner by slug', async () => {
     const { fileStore } = await import('@/lib/subscription/server-store')
     const store = fileStore(() => at('2026-10-01T00:00:00Z'))
-    expect((await store.catalog()).plans.map((p) => p.id)).toEqual(['starter', 'growth', 'pro'])
+    expect((await store.catalog()).plans.map((p) => p.id)).toEqual(['starter', 'growth', 'pro', 'pay-as-you-sell'])
 
     // Concurrent writes are serialised, none lost.
     await Promise.all([

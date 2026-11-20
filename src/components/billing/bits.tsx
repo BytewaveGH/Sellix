@@ -30,6 +30,12 @@ const inDays = (n: number) => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${
 // One line saying where a subscription stands, e.g. "Trial ends in 5 days".
 export const accessLine = (access: Access, sub?: Subscription | null): string => {
   const { state, endsAt, daysLeft, lockAt } = access
+  // Pay as you sell is billed after each month, so its dates are bill dates.
+  if (access.plan?.usage && !sub?.cancelAtPeriodEnd) {
+    if (state === 'active') return `Next bill on ${shortDate(endsAt!)}`
+    if (state === 'past_due')
+      return `Bill due since ${shortDate(endsAt!)} — locks ${lockAt ? formatDistanceToNowStrict(lockAt, { addSuffix: true }) : 'soon'}`
+  }
   switch (state) {
     case 'none':
       return 'Not on a plan — full access'

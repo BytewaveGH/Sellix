@@ -11,7 +11,9 @@ import { accessFor, cedis, cycleLabel, priceFor } from '@/lib/subscription/acces
 import { applyAction, type BillingAction } from '@/lib/subscription/billing'
 import type { BillingCycle, Catalog, PaymentMethod, Plan, Subscription } from '@/lib/subscription/types'
 import { METHOD_LABELS, shortDate } from '@/components/billing/bits'
-import { useBillingActions } from '../_logics/billing'
+import { UsageBillCard } from '@/components/billing/usage'
+import { salesOf, usageBill } from '@/lib/subscription/usage'
+import { useBillingActions, useUsage } from '../_logics/billing'
 import type { TenantRecord } from '../_logics/types'
 
 export type BillingDrawer = 'plan' | 'payment' | 'extend' | 'cancel' | null
@@ -86,14 +88,21 @@ const PlanPicker = ({
               {p.archived && <span className="ml-2 text-[10px] font-semibold text-stone-400 uppercase">Archived</span>}
             </span>
             <span className="block text-xs text-stone-500">
-              {p.limits.staff === null ? 'Unlimited staff' : `${p.limits.staff} staff`} · {p.features.length} extra feature
-              {p.features.length === 1 ? '' : 's'}
+              {p.usage
+                ? 'Every feature · unlimited staff'
+                : `${p.limits.staff === null ? 'Unlimited staff' : `${p.limits.staff} staff`} · ${p.features.length} extra feature${
+                    p.features.length === 1 ? '' : 's'
+                  }`}
             </span>
           </span>
-          <span className="text-sm font-extrabold text-stone-900 tabular-nums">
-            {cedis(priceFor(p, cycle))}
-            <span className="text-[11px] font-semibold text-stone-400">/{cycleLabel(cycle) === 'year' ? 'yr' : 'mo'}</span>
-          </span>
+          {p.usage ? (
+            <span className="text-sm font-extrabold text-stone-900">Fee on sales</span>
+          ) : (
+            <span className="text-sm font-extrabold text-stone-900 tabular-nums">
+              {cedis(priceFor(p, cycle))}
+              <span className="text-[11px] font-semibold text-stone-400">/{cycleLabel(cycle) === 'year' ? 'yr' : 'mo'}</span>
+            </span>
+          )}
           {on && <Check className="h-4 w-4 text-endeavour flex-shrink-0" />}
         </button>
       )
@@ -126,17 +135,21 @@ export const PlanDrawer = ({ tenant, sub, catalog, open, onOpenChange, onNext }:
   }, [open])
 
   const days = Math.max(0, Math.round(toNum(trialDays)))
+  // Pay as you sell is monthly, has no trial and is billed after the month.
+  const usage = !!plan?.usage
+  const planCycle: BillingCycle = usage ? 'monthly' : cycle
   const action: BillingAction = restart
-    ? { type: 'assign', planId, cycle, trialDays: trial ? days : 0 }
-    : { type: 'change-plan', planId, cycle }
-  const unchanged = !restart && planId === sub?.planId && cycle === sub?.cycle
+    ? { type: 'assign', planId, cycle: planCycle, trialDays: trial && !usage ? days : 0 }
+    : { type: 'change-plan', planId, cycle: planCycle }
+  const unchanged = !restart && planId === sub?.planId && planCycle === sub?.cycle
+  const result = useMemo(() => (plan ? preview(sub, tenant.id, action, catalog) : null), [sub, tenant.id, catalog, planId, planCycle, trial, days, restart]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = () =>
     run(
       () => actions.act(tenant.id, action, restart ? `${tenant.name} is on ${plan?.name}` : `${tenant.name} moved to ${plan?.name}`),
       () => {
         onOpenChange(false)
-        if (restart && !(trial && days > 0)) onNext?.('payment')
+        if (restart && !usage && !(trial && days > 0)) onNext?.('payment')
       }
     )
 
@@ -156,23 +169,43 @@ export const PlanDrawer = ({ tenant, sub, catalog, open, onOpenChange, onNext }:
             Cancel
           </Button>
           <Button onClick={save} loading={saving} disabled={!plan || unchanged}>
-            {restart ? (trial && days > 0 ? 'Start trial' : 'Assign plan') : 'Change plan'}
+            {restart ? (trial && days > 0 && !usage ? 'Start trial' : 'Assign plan') : 'Change plan'}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-5">
-        <Segmented
-          ariaLabel="Billing cycle"
-          value={cycle}
-          onChange={setCycle}
-          options={[
-            { value: 'monthly', label: 'Monthly' },
-            { value: 'yearly', label: 'Yearly' },
-          ]}
-        />
+        {!usage && (
+          <Segmented
+            ariaLabel="Billing cycle"
+            value={cycle}
+            onChange={setCycle}
+            options={[
+              { value: 'monthly', label: 'Monthly' },
+              { value: 'yearly', label: 'Yearly' },
+            ]}
+          />
+        )}
         <PlanPicker plans={offered} value={planId} onChange={setPlanId} cycle={cycle} />
-        {restart && (
+        {usage && (
+          <div className="rounded-2xl border border-stone-200 p-4 text-xs text-stone-600">
+            No trial and nothing to pay now. The business is billed after each month from its sales
+            {result ? (
+              <>
+                {' '}
+                — first bill on <span className="font-semibold text-stone-900">{shortDate(result.currentPeriodEnd)}</span>.
+              </>
+            ) : (
+              '.'
+            )}
+            {!restart && sub && !accessFor(sub, catalog.plans, catalog.settings, new Date()).plan?.usage && (
+              <span className="block mt-1.5 text-amber-700">
+                Its first month starts today. Time already paid on the current plan isn’t carried over, so settle any refund by hand.
+              </span>
+            )}
+          </div>
+        )}
+        {restart && !usage && (
           <div className="rounded-2xl border border-stone-200 p-4 flex flex-col gap-3">
             <Toggle checked={trial} onChange={setTrial} label="Start with a free trial" hint="Full access, no payment until it ends" />
             {trial && (
@@ -199,6 +232,10 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
   const plan = catalog.plans.find((p) => p.id === sub?.planId)
   const cycle = sub?.cycle ?? 'monthly'
   const periodOptions = cycle === 'yearly' ? [1, 2] : [1, 3, 6, 12]
+  // Pay as you sell: one month's bill at a time, worked out from its sales.
+  const usagePricing = plan?.usage
+  const usage = useUsage(tenant.id, open && !!usagePricing)
+  const bill = usagePricing && usage.data ? usageBill(salesOf(usage.data), usagePricing) : null
   const [periods, setPeriods] = useState(1)
   const [amount, setAmount] = useState('')
   const [amountTouched, setAmountTouched] = useState(false)
@@ -216,8 +253,10 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
   }, [open])
   // Amount follows the plan price until the operator types their own.
   useEffect(() => {
-    if (!amountTouched) setAmount(plan ? String(priceFor(plan, cycle) * periods) : '')
-  }, [plan, cycle, periods, amountTouched])
+    if (amountTouched) return
+    if (usagePricing) setAmount(bill ? String(bill.total) : '')
+    else setAmount(plan ? String(priceFor(plan, cycle) * periods) : '')
+  }, [plan, usagePricing, bill?.total, cycle, periods, amountTouched]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Noon local time, so the stored instant stays on the chosen calendar day.
   const paidAt = paidOn ? new Date(`${paidOn}T12:00:00`).toISOString() : undefined
@@ -262,18 +301,36 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
       }
     >
       <div className="flex flex-col gap-5">
-        <Field label={`${cycle === 'yearly' ? 'Years' : 'Months'} paid for`}>
-          <Segmented
-            ariaLabel="Periods paid for"
-            value={periods}
-            onChange={setPeriods}
-            options={periodOptions.map((n) => ({ value: n, label: String(n) }))}
+        {usagePricing && sub ? (
+          <UsageBillCard
+            pricing={usagePricing}
+            report={usage.data}
+            periodStart={sub.currentPeriodStart}
+            periodEnd={sub.currentPeriodEnd}
+            audience="platform"
           />
-        </Field>
+        ) : (
+          <Field label={`${cycle === 'yearly' ? 'Years' : 'Months'} paid for`}>
+            <Segmented
+              ariaLabel="Periods paid for"
+              value={periods}
+              onChange={setPeriods}
+              options={periodOptions.map((n) => ({ value: n, label: String(n) }))}
+            />
+          </Field>
+        )}
         <FormGrid>
           <Field
             label="Amount received"
-            hint={plan ? `${plan.name}: ${cedis(priceFor(plan, cycle))} per ${cycleLabel(cycle)}` : undefined}
+            hint={
+              usagePricing
+                ? bill
+                  ? `This month’s bill: ${cedis(bill.total)}`
+                  : 'Enter the bill amount'
+                : plan
+                  ? `${plan.name}: ${cedis(priceFor(plan, cycle))} per ${cycleLabel(cycle)}`
+                  : undefined
+            }
             htmlFor="pay-amount"
           >
             <Input
@@ -317,7 +374,16 @@ export const PaymentDrawer = ({ tenant, sub, catalog, open, onOpenChange }: Draw
         <Field label="Reference" hint="MoMo transaction ID, bank reference or receipt number" htmlFor="pay-ref">
           <Input id="pay-ref" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={120} />
         </Field>
-        {result && (
+        {result && usagePricing && sub && (
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-900">
+            Settles the bill for{' '}
+            <span className="font-semibold">
+              {shortDate(sub.currentPeriodStart)} – {shortDate(sub.currentPeriodEnd)}
+            </span>
+            . Next bill on <span className="font-semibold">{shortDate(result.currentPeriodEnd)}</span>.
+          </div>
+        )}
+        {result && !usagePricing && (
           <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2 flex-wrap">
             Covers
             <span className="font-semibold">{shortDate(result.currentPeriodStart)}</span>

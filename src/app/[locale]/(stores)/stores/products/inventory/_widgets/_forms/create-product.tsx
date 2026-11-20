@@ -14,6 +14,8 @@ import { ProductServices } from '../../_logics/services'
 import { useFetchData } from '@/hooks/use-fetch'
 import { UnitServices, WarehouseServices } from '../../../categories/_logics/services'
 import { IGeneric } from '@/types/interfaces'
+import { useBilling } from '@/lib/subscription/client'
+import { DEFAULT_FEE_CLASS, FEE_CLASSES, FEE_CLASS_KEYS, feeClassOf, percent, type FeeClass } from '@/lib/subscription/usage'
 import TagInput from './tag-input'
 import ProductRecognition from './product-recognition'
 import {
@@ -32,6 +34,7 @@ const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   description: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
+  feeClass: z.enum(FEE_CLASS_KEYS as [FeeClass, ...FeeClass[]]).default(DEFAULT_FEE_CLASS),
   purchasePrice: z.coerce.number().min(0, 'Required'),
   minQuantity: z.coerce.number().int().optional(),
   brand: z.string().trim().max(120).optional(),
@@ -223,6 +226,9 @@ const CreateProduct = ({ mode = 'create', productId, initialData, onSuccess }: C
     })
   }
 
+  // Pay as you sell charges by the product's fee type, so the field shows only on that plan.
+  const usagePricing = useBilling().access.plan?.usage
+
   const { data: unitsData } = useFetchData('units', UnitServices.FetchAll() as unknown as IGeneric)
   const unitOptions = ((unitsData as any[] | undefined) ?? []).map((u: any) => ({ text: u.name, value: String(u.id) }))
 
@@ -239,6 +245,8 @@ const CreateProduct = ({ mode = 'create', productId, initialData, onSuccess }: C
       name: initialData?.name ?? '',
       description: initialData?.description ?? '',
       category: initialData?.category ?? '',
+      // Kept as saved even when the field isn't shown, so editing never resets it.
+      feeClass: feeClassOf(initialData?.feeClass),
       purchasePrice: initialData?.purchasePrice ?? 0,
       minQuantity: initialData?.minQuantity ?? undefined,
       brand: initialData?.brand ?? '',
@@ -309,6 +317,7 @@ const CreateProduct = ({ mode = 'create', productId, initialData, onSuccess }: C
   }
 
   const imageUrl = form.watch('imageUrl')
+  const feeClass = form.watch('feeClass')
   const watchedUnits = form.watch('units')
   const purchasePrice = Number(form.watch('purchasePrice')) || 0
   const unitName = (id: number) => unitOptions.find((o) => o.value === String(id))?.text ?? 'Unit'
@@ -361,6 +370,23 @@ const CreateProduct = ({ mode = 'create', productId, initialData, onSuccess }: C
                 inputType="number"
               />
             </div>
+
+            {usagePricing && (
+              <div>
+                <SelectTemplate
+                  control={form.control}
+                  name="feeClass"
+                  label="Fee type (Pay as you sell)"
+                  content={FEE_CLASSES.map((c) => ({
+                    text: `${c.label} · ${percent(usagePricing.rates.retail[c.key])}`,
+                    value: c.key,
+                  }))}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {FEE_CLASSES.find((c) => c.key === feeClass)?.examples}. The service fee on this product’s sales.
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <InputsTemplate control={form.control} name="brand" label="Brand" placeholder="e.g. Kasapreko" />

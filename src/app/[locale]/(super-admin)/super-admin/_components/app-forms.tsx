@@ -465,7 +465,7 @@ export const RegisterAppWizard = ({
                     id: p.id,
                     title: p.name,
                     body: p.tagline,
-                    price: `${cedis(priceFor(p, cycle))}/${cycleLabel(cycle)}`,
+                    price: p.usage ? 'Fee on sales' : `${cedis(priceFor(p, cycle))}/${cycleLabel(cycle)}`,
                   })),
                   { id: '', title: 'No plan', body: 'Free, full access — for partners or internal use', price: '' },
                 ].map((o) => {

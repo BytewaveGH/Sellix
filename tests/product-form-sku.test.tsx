@@ -13,6 +13,8 @@ vi.mock('@/hooks/use-fetch', () => ({
   }),
 }))
 vi.mock('@/hooks/use-permissions', () => ({ usePermissions: () => ({ canManageProducts: false }) }))
+// A fixed-price plan: the Pay as you sell fee type isn't shown.
+vi.mock('@/lib/subscription/client', () => ({ useBilling: () => ({ access: { plan: null } }) }))
 
 // Radix primitives used by the form's selects expect these in the browser.
 beforeAll(() => {
@@ -66,6 +68,17 @@ describe('duplicate SKU on the product form', () => {
     expect(update).toMatchObject({ method: 'PUT', url: '/products/5', data: { sku: 'TAKEN-1' } })
     expect(update.data).not.toHaveProperty('brand')
     expect(update.data).not.toHaveProperty('imageUrl')
+    // The fee type isn't shown on this plan; the saved one (none → general) goes back unchanged.
+    expect(update.data.feeClass).toBe('general')
+    expect(screen.queryByText('Fee type (Pay as you sell)')).toBeNull()
+  })
+
+  it('keeps a product’s saved fee type when it is edited', async () => {
+    mocks.request.mockResolvedValue({})
+    render(<CreateProduct mode="update" productId={5} initialData={{ ...product, feeClass: 'high' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Update Product' }))
+    await waitFor(() => expect(mocks.request).toHaveBeenCalled())
+    expect(mocks.request.mock.calls[0][0].data.feeClass).toBe('high')
   })
 
   it('other errors are shown as a general message, not on the SKU field', async () => {

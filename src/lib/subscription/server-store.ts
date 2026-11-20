@@ -16,6 +16,7 @@ import { BillingError, applyAction, parseAction, parseCatalog, OWNER_ACTIONS } f
 import { plansInUse } from './insights'
 import { DEFAULT_CATALOG } from './plans'
 import type { Catalog, Subscription } from './types'
+import type { UsageReport } from './usage'
 
 export interface TenantUser {
   tenant: string
@@ -26,6 +27,9 @@ export interface TenantUser {
 export interface TenantBilling {
   subscription: Subscription | null
   catalog: Catalog
+  // Pay as you sell: sales so far in the current billing period, counted by
+  // the backend (§8.5). Null when not on that plan or not counted yet.
+  usage?: UsageReport | null
 }
 
 export interface BillingStore {
@@ -33,6 +37,8 @@ export interface BillingStore {
   saveCatalog(input: unknown): Promise<Catalog>
   list(): Promise<Subscription[]>
   get(tenantId: number): Promise<Subscription | null>
+  // Pay as you sell: a business's sales in its current billing period.
+  usage(tenantId: number): Promise<UsageReport | null>
   act(tenantId: number, action: unknown): Promise<Subscription>
   forTenant(user: TenantUser): Promise<TenantBilling>
   actForTenant(user: TenantUser, action: unknown): Promise<Subscription>
@@ -104,10 +110,12 @@ export const fileStore = (now: () => Date = () => new Date()): BillingStore => {
       }),
     list: async () => Object.values((await read()).subscriptions),
     get: async (tenantId) => (await read()).subscriptions[tenantId] ?? null,
+    // Sales live in the backend; this server can't count them.
+    usage: async () => null,
     act: (tenantId, action) => act(tenantId, action, 'platform'),
     forTenant: async (user) => {
       const [data, id] = await Promise.all([read(), tenantIdForSlug(user.tenant)])
-      return { subscription: data.subscriptions[id] ?? null, catalog: data.catalog }
+      return { subscription: data.subscriptions[id] ?? null, catalog: data.catalog, usage: null }
     },
     actForTenant: async (user, action) => act(await tenantIdForSlug(user.tenant), action, 'owner'),
   }
@@ -143,12 +151,21 @@ export const apiStore = (): BillingStore => ({
   list: async () => (await unwrap<Subscription[]>(await platformFetch('/platform/subscriptions'), 'Couldn’t load subscriptions')) ?? [],
   get: async (id) =>
     (await unwrap<Subscription | null>(await platformFetch(`/platform/tenants/${id}/subscription`), 'Couldn’t load subscription')) ?? null,
+  // Not shipped yet (404) or nothing counted: no figures rather than an error.
+  usage: async (id) => {
+    const res = await platformFetch(`/platform/tenants/${id}/usage`)
+    if (res.status === 404) return null
+    return (await unwrap<UsageReport | null>(res, 'Couldn’t load sales for billing')) ?? null
+  },
   act: async (id, action) =>
     unwrap(
       await platformFetch(`/platform/tenants/${id}/subscription/actions`, { method: 'POST', body: JSON.stringify(parseAction(action)) }),
       'Couldn’t update subscription'
     ),
-  forTenant: async (user) => unwrap(await tenantFetch(user, '/billing'), 'Couldn’t load billing'),
+  forTenant: async (user) => {
+    const data = await unwrap<TenantBilling>(await tenantFetch(user, '/billing'), 'Couldn’t load billing')
+    return { ...data, usage: data?.usage ?? null }
+  },
   actForTenant: async (user, action) =>
     unwrap(
       await tenantFetch(user, '/billing/actions', { method: 'POST', body: JSON.stringify(parseAction(action)) }),

@@ -383,7 +383,7 @@ Same four routes per resource as §6.2 (`GET /`, `POST /`, `PUT /:id`, `DELETE /
 
   The server prices every line from the current menu, in the restaurant's local time:
 
-  - Unit price = item price + each chosen option's `priceDelta` + each combo pick's `upcharge`, except options in an extras group with `chargeOnce: true` (§7.6). Those are added once to the line, not once per unit.
+  - Unit price = item price + each chosen option's `priceDelta` + each combo pick's `upcharge`.
   - Then the single best **live** promotion covering the item (by item or category, or the whole menu when both lists are empty) takes `percentOff`.
   - Delivery adds `fulfilment.delivery.fee`.
   - It returns the `Order` plus a one-time `accessKey`, which is a random secret of at least 16 characters.
@@ -509,29 +509,6 @@ Expense    { id, restaurantId, category, amount, date, note? }
 - Net profit: gross profit − waste moves' cost − expenses.
 
 Purchases are money out, not a cost, until the stock is used or wasted.
-
-### 7.6 Extras charged once per line (change needed)
-
-Chop bars sell "TZ for ₵20" (Regular ₵5 × 4) with **one** fish (₵20) on top. Today an extra is charged for every unit, so the line comes to (5 + 20) × 4 = ₵100 instead of 5 × 4 + 20 = ₵40. Owners can now mark an extras group (`kind: "addon"`) as charged once per line. The new field is on the option group, stored inside `optionGroups` JSON as usual:
-
-```
-{ "id": "protein", "name": "Proteins", "kind": "addon", "min": 0, "max": 3, "chargeOnce": true, "choices": [...] }
-```
-
-Missing or `false` means the current behaviour, so existing menus are unchanged. Ignore it on `kind: "variant"` groups.
-
-**Order pricing** (`storefront.go`, and counter orders), per line:
-
-- `unitPrice` = item price + `priceDelta` of chosen options in groups **without** `chargeOnce` + combo `upcharge`s, minus the promotion's `percentOff`. As today.
-- `onceExtras` = sum of `priceDelta` of chosen options in groups **with** `chargeOnce`, minus the same `percentOff`. Store it on the line; omit it (or 0) when there are none.
-- `lineTotal` = `unitPrice × quantity + onceExtras`.
-- Order subtotal and discount: add each line's `onceExtras` (before and after the promotion) once, not × quantity.
-
-**Stock (§7.5):** an option's recipe in a `chargeOnce` group is used once per line, not × quantity. Store `unitCost` as the line's ingredient cost ÷ quantity, so `unitCost × quantity` stays the line's cost.
-
-**Offline counter orders (§13, `/eatery/sync/orders`):** each line now carries `onceExtras` beside `unitPrice` when it has once-charged extras. Keep both as paid; the price-mismatch tolerance applies to `unitPrice × quantity + onceExtras`.
-
-The frontend rules are in `src/lib/eatery/menu.ts` (`linePrice`, `priceOrder`) and `costing.ts` (`lineUsage`), with tests in `tests/eatery-charge-once.test.ts`. Until this is live, tills on the API data source will show ₵40 but the server will record ₵100 for such lines, so don't switch the setting on for a live restaurant before then.
 
 ### 7.4 Later
 
@@ -896,22 +873,6 @@ Shops lose internet often. The plan is for the till (POS) to keep selling while 
 3. After a long outage it sends many sales at once.
 4. The catalogue is kept on the PC and updated with "what changed since last time".
 
-**What the app already does** (no backend change needed for these):
-
-- Every module (retail, eatery, real estate, amusement) keeps the last answer to each read on the PC and shows it while offline. The app's screens are kept too (service worker), so it opens with no internet.
-- While offline, new sales, counter orders and edits are saved on the PC and sent with the normal endpoints, in order, once the connection returns. Rows made offline get a temporary negative id, swapped for the server's id before later changes to them are sent.
-- A change is only kept if it was never sent. If a send gets no reply and the server can't recognise a repeat, the app asks a person to check rather than sending it again.
-
-**Status (frontend, after the backend shipped §13):** the app uses all of it.
-
-- **Till sales and counter orders:** they carry `clientId`, `receiptNo`, `deviceId` and `soldAt`. When kept offline they also carry the price paid per item.
-- **Sending:** they go up through `/sync/sales` and `/eatery/sync/orders` in batches of up to 200, with `X-Device-Id`.
-- **Catalogue and menu:** kept current with `/sync/changes` and `/eatery/sync/changes`.
-- **Cashiers:** refresh through `/employees/refresh`.
-- **Review:** the orders screen has "Stock went short" and "Price differs" views.
-
-The four problems below are what §13 fixed.
-
 Today's sale endpoint can't support this safely, for four reasons:
 
 - **Duplicates on retry.** `POST /sales` has no ID from the till, so a retry after a lost reply records the sale twice.
@@ -994,71 +955,9 @@ The till keeps the catalogue on the PC. Instead of downloading everything each t
 - **Short-stock report:** `GET /sales?stockShort=true` (or a filter on the existing list, §11.2) so the owner can see which offline sales took stock below zero and recount.
 - **Price-mismatch report:** `GET /sales?priceMismatch=true`, for the same reason.
 
-### 13.5 Logins on bad internet (three small asks)
+### 13.5 Logins on bad internet (frontend note, no backend change)
 
-Done in the frontend: a refresh that fails *because the server can't be reached* no longer logs anyone out. Only an answer from the server does: no response, a timeout or a 502/503/504 keeps the session and tries again later. Three small asks:
-
-1. **Refresh tokens:** keep them valid for at least a few days, so a till that was offline overnight can still refresh in the morning.
-2. **A bad or expired refresh token should get 401, not 500.** `sellix.account`'s `RefreshToken` handler answers every error with 500 (`app/framework/http/handlers/api/auth.go`). The frontend has to treat a 500 from `/auth/refresh` as "session over", so a real server crash there also logs people out. With 401 for "token rejected", a 500 can safely mean "try again later".
-3. **`GET /health`** on `sellix.apis`: no auth, no tenant, returns `200 {"ok":true}` quickly. The connection indicator checks the API about every 15 seconds while there's a problem. Today it sends a `HEAD` to the API's base address and counts any answer (even a 404) as "reachable"; a real health route would also catch "the server answers but the database is down".
-
-## 14. Amusement park: ticket counter, gate and park day (additions to §4)
-
-The amusement module now has:
-
-- a **ticket counter** that prints tickets with a QR code;
-- a **gate check-in** screen that scans them;
-- a **park dashboard** (guests, takings, hourly sales, ride status);
-- a **Hall of Fame** lobby board;
-- a **prize wheel**.
-
-All of it runs on today's §4 endpoints, with workarounds where the data falls short. These asks remove the workarounds.
-
-### 14.1 A real ticket code (most important)
-
-Tickets today are identified only by their sequential `id`, so a guessed id could be printed as a fake ticket. The frontend prints `T{id}-{check}`, where the 3-character check is derived from the id and the exact `createdAt`. That's an interim guard, not real security.
-
-- **Field:** add `code` to `Ticket`: random, at least 10 characters from an unambiguous alphabet (no 0/O/1/I), unique per tenant, generated on create and returned everywhere a ticket is.
-- **Lookup:** add `GET /tickets/by-code/:code`, returning the ticket (with its attraction) or 404. Permission: `canManageSales`.
-- **QR:** once `code` exists, the QR will carry it and the gate will look tickets up by it, instead of downloading every ticket.
-
-### 14.2 Redeem must refuse a used ticket
-
-`PATCH /tickets/:id/redeem` sets `redeemed` even when the ticket is already redeemed (`app/application/ticket/repository.go`, `redeem`). So two gates can both admit the same ticket. The gate checks the status first, but that's a race.
-
-- **Already used:** do it in one statement, `UPDATE … SET status='redeemed', redeemed_at=now() WHERE id=? AND status='valid'`. If no row changed, answer **409** `{ "code": "already_redeemed", "redeemedAt": "…" }`.
-- **New fields:** `redeemedAt` (time) and `redeemedBy` (employee id) on the ticket. The gate will then show *when* a ticket was used ("ALREADY USED at 10:42"), and the dashboard can count admissions per hour.
-
-### 14.3 What was paid for a ticket
-
-Tickets have no price. The dashboard's takings are an estimate: quantity × the attraction's *current* price, or the general admission price set on the counter. That goes wrong as soon as a price changes. Add to `CreateTicketRequest` and `Ticket`:
-
-```json
-{ "attractionId": 3, "quantity": 2, "buyerName": "Ama",
-  "unitPrice": 50, "paymentType": "cash", "clientId": "6f1c…", "soldAt": "2026-11-16T10:02:31Z" }
-```
-
-- **`unitPrice`:** the price charged, kept on the ticket. If omitted, use the attraction's price at the time, or the park's admission price (§14.4).
-- **`paymentType`:** `cash` | `momo` | `card`.
-- **`clientId` and `soldAt`:** same rules as §13.1, so tickets sold offline are recorded once and dated right.
-- **Reports:** add `GET /tickets?from=&to=` so the dashboard loads only the day it shows. Today it downloads every ticket ever sold.
-
-### 14.4 Park settings, shared by every till
-
-The **park name**, the **general admission price** (tickets with no attraction), the **ticket footer message** and the **prize wheel's prizes** are kept on each device today. Add `GET/PUT /amusement/settings`:
-
-```json
-{ "parkName": "Bambo Adventure Park", "admissionPrice": 30, "ticketNote": "Have fun!",
-  "prizes": [ { "id": "free-ride", "label": "Free ride", "color": "#7C3AED", "weight": 1 } ] }
-```
-
-- **Who:** owner and `canManageProducts` may write; any staff may read.
-- **Public:** `GET /public/amusement/park` should return `{ parkName }`, so the Hall of Fame board can show the park's name.
-
-### 14.5 Small fixes
-
-- **Price can't go back to 0.** `PUT /attractions/:id` ignores `ticketPrice: 0` and `capacity: 0` (it only sets values > 0), so a ride can't be made free again. Use pointer fields (`*float64`, `*int`) so 0 means 0.
-- **Bookings need a time.** `date` is a day, but group visits and birthday parties are booked for a time slot. Accept a full date-time and return it. Optionally add `durationMinutes`.
+The frontend will stop logging cashiers out when a token refresh fails *because the network is down*. Only a real 401 from the refresh endpoint will end the session. No backend change is needed, but please keep the refresh token valid for at least a few days, so a till that was offline overnight can still refresh in the morning.
 
 ## Priority
 
@@ -1066,15 +965,14 @@ The **park name**, the **general admission price** (tickets with no attraction),
 2. `appType` on login responses (§2) — small addition, unblocks correct per-vertical routing for every real tenant (currently everyone defaults to "retail").
 3. Platform-level stats/employees (§3) — lower priority, purely additive to the super admin dashboard; the mock data is clearly labeled as such and isn't blocking anything else.
 4. Real estate vertical (§6) — frontend is live on browser-only storage; these endpoints make it multi-device and durable.
-5. Eatery platform (§7) — owner dashboard and public storefronts are live on browser-only storage; customers' orders only reach the owner once these exist. §7.6 (extras charged once per line) is needed before owners turn that setting on for a live restaurant.
+5. Eatery platform (§7) — owner dashboard and public storefronts are live on browser-only storage; customers' orders only reach the owner once these exist.
 6. Subscriptions and billing (§8) — plans, payments and gating work today on a server-side JSON file. These endpoints make billing durable, and §8.4 makes access limits enforceable instead of only shown in the UI.
 7. Store stats fixes (§9) — §9.1 (cost of goods per unit) first: until then any piece or pack sold under the flat/wholesale rule is costed as a whole box, so those products show a loss. §9.4–9.5 make daily cash/MoMo reconciliation exact.
 8. Accounts and team (§10) — §10.3's `PUT /auth/reset-password/:id` lockdown first (security). Then owner change/forgot password (§10.3), staff change password (§10.1) and suspend (§10.2).
 9. Store module (§11) — §11.1 store settings first, so every till shares the receipt and payment setup. Then the list filters (§11.2).
 10. Real-estate public website (§12) — §12.2 and §12.3 make the shared link work for everyone, not just on the owner's device. Photos need §12.2's image upload.
 11. Offline selling (§13) — §13.1 first: a `clientId` on sales makes retries safe, which helps even on today's flaky connections. Then batch sync (§13.2) and "changes since" downloads (§13.3).
-12. Amusement (§14) — §14.2 first (two gates can admit the same ticket today), then §14.1 ticket codes and §14.3 prices on tickets.
-13. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
-14. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
+12. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
+13. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
 
 Happy to hop on a call to go through response shapes/edge cases once you've had a look.

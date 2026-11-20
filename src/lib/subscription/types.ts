@@ -5,6 +5,7 @@
 // grace period (access.ts), so nothing needs a scheduled job to flip states.
 
 import type { FeatureKey } from './features'
+import type { UsagePricing } from './usage'
 
 export type BillingCycle = 'monthly' | 'yearly'
 
@@ -28,6 +29,10 @@ export interface Plan {
   highlighted?: boolean
   // Hidden from new sign-ups and upgrade options; existing subscribers keep it.
   archived?: boolean
+  // "Pay as you sell" (usage.ts): no monthly price, every feature, unlimited
+  // staff, and a service fee on sales billed monthly. Prices, features, staff
+  // and trial above are ignored (parseCatalog normalises them).
+  usage?: UsagePricing
 }
 
 export interface BillingSettings {

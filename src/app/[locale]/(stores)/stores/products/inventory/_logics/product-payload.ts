@@ -2,6 +2,7 @@
 // (brand/sku/imageUrl/aliases, per-unit baseQuantity/barcodes) is testable.
 
 import { apiErrorMessage, apiStatus } from '@/lib/api-error'
+import { feeClassOf } from '@/lib/subscription/usage'
 import type { PricingRule } from '../../../pos/_logics/types'
 
 // The server's enum (flat | half-box | bulk-wholesale) — one definition, shared with the POS.
@@ -29,6 +30,8 @@ export type ProductFormValues = {
   sku?: string
   imageUrl?: string
   aliases?: string[]
+  // Pay as you sell: which fee rate this product's sales pay (usage.ts).
+  feeClass?: string
   units: UnitFormValues[]
   stock: { warehouseId: number; quantity: number }[]
 }
@@ -63,6 +66,7 @@ export const buildCreateProductPayload = (data: ProductFormValues) => {
     brand: clean(data.brand),
     sku: clean(data.sku),
     imageUrl: clean(data.imageUrl),
+    feeClass: feeClassOf(data.feeClass),
     ...(aliases.length > 0 ? { aliases } : {}),
     units: data.units.map((u) => {
       const barcodes = cleanList(u.barcodes)
@@ -89,6 +93,7 @@ export const buildUpdateProductPayload = (data: ProductFormValues, initial: Part
     category: data.category,
     purchasePrice: data.purchasePrice,
     minQuantity: data.minQuantity,
+    feeClass: feeClassOf(data.feeClass),
     ...changed,
   }
 }

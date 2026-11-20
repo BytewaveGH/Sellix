@@ -1,7 +1,9 @@
 // The catalog a fresh platform starts with. Prices and contents are a starting
 // point — the super admin edits them under Console → Plans.
 
+import { FEATURE_KEYS } from './features'
 import type { Catalog } from './types'
+import { DEFAULT_USAGE_PRICING } from './usage'
 
 export const DEFAULT_CATALOG: Catalog = {
   plans: [
@@ -55,6 +57,17 @@ export const DEFAULT_CATALOG: Catalog = {
         'amusement.leaderboard',
       ],
       trialDays: 14,
+    },
+    {
+      id: 'pay-as-you-sell',
+      name: 'Pay as you sell',
+      tagline: 'No monthly price — a small service fee on what you sell',
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      limits: { staff: null },
+      features: [...FEATURE_KEYS],
+      trialDays: 0,
+      usage: DEFAULT_USAGE_PRICING,
     },
   ],
   settings: {
