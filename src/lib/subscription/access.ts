@@ -50,19 +50,24 @@ export const accessFor = (
   return { ...base, state: 'expired', hasAccess: false, lockAt }
 }
 
-// Features: with no plan (no record, or a plan that was removed) nothing is gated.
-export const canUseFeature = (access: Pick<Access, 'plan'>, feature: FeatureKey) => !access.plan || access.plan.features.includes(feature)
+// Features: with no plan (no record, or a plan that was removed) nothing is
+// gated. Pay as you sell includes every feature.
+export const canUseFeature = (access: Pick<Access, 'plan'>, feature: FeatureKey) =>
+  !access.plan || !!access.plan.usage || access.plan.features.includes(feature)
 
-export const staffLimit = (access: Pick<Access, 'plan'>): number | null => access.plan?.limits.staff ?? null
+// Pay as you sell has no staff limit.
+export const staffLimit = (access: Pick<Access, 'plan'>): number | null =>
+  access.plan?.usage ? null : (access.plan?.limits.staff ?? null)
 
 export const canAddStaff = (access: Pick<Access, 'plan'>, used: number) => {
   const limit = staffLimit(access)
   return limit === null || used < limit
 }
 
-// The cheapest plan that includes a feature (for "Available on Growth").
+// The cheapest fixed-price plan that includes a feature (for "Available on
+// Growth"). Pay as you sell has every feature but no price to compare.
 export const cheapestPlanWith = (plans: Plan[], feature: FeatureKey) =>
-  plans.filter((p) => !p.archived && p.features.includes(feature)).sort((a, b) => a.monthlyPrice - b.monthlyPrice)[0] ?? null
+  plans.filter((p) => !p.archived && !p.usage && p.features.includes(feature)).sort((a, b) => a.monthlyPrice - b.monthlyPrice)[0] ?? null
 
 // ── Money ────────────────────────────────────────────────────────────────────
 

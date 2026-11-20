@@ -50,6 +50,8 @@ export const useBilling = () => {
   return {
     access,
     subscription: q.data?.subscription ?? null,
+    // Pay as you sell: sales counted so far this period, if any.
+    usage: q.data?.usage ?? null,
     catalog,
     // True once we know (loaded, failed, or not applicable) — gates wait for it.
     settled: !enabled || q.isSuccess || q.isError,

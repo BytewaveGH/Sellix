@@ -5,15 +5,94 @@ import { Archive, Check, Minus, Pencil, Plus, Star, Trash2, Users } from 'lucide
 import { cn } from '@/lib/utils'
 import { slugify } from '@/lib/tenant'
 import { Button, Card, ErrorNote, LoadingGrid, PageHeader, SectionTitle } from '@/components/kit/ui'
-import { Drawer, Field, FormGrid, Input, Textarea, Toggle, toNum } from '@/components/kit/form'
+import { Drawer, Field, FormGrid, Input, Segmented, Textarea, Toggle, toNum } from '@/components/kit/form'
+import { DEFAULT_USAGE_PRICING, FEE_CLASSES, percent, type UsagePricing, type UsageRates } from '@/lib/subscription/usage'
 import { cedis, yearlySavings } from '@/lib/subscription/access'
-import { featuresFor, type FeatureKey } from '@/lib/subscription/features'
+import { FEATURE_KEYS, featuresFor, type FeatureKey } from '@/lib/subscription/features'
 import { plansInUse } from '@/lib/subscription/insights'
 import type { Catalog, Plan } from '@/lib/subscription/types'
 import { VERTICALS } from '@/lib/verticals'
 import { useBillingActions, useCatalog, useSubscriptions } from '../_logics/billing'
 
 const BLANK: Plan = { id: '', name: '', tagline: '', monthlyPrice: 0, yearlyPrice: 0, limits: { staff: 5 }, features: [], trialDays: 14 }
+
+// ── Pay as you sell rates ────────────────────────────────────────────────────
+
+const RateInput = ({ id, label, hint, value, onChange }: { id: string; label: string; hint?: string; value: number; onChange: (n: number) => void }) => (
+  <Field label={label} hint={hint} htmlFor={id}>
+    <Input
+      id={id}
+      type="number"
+      min={0}
+      max={20}
+      step="0.05"
+      prefix="%"
+      value={value}
+      onChange={(e) => onChange(Math.min(20, Math.max(0, toNum(e.target.value))))}
+    />
+  </Field>
+)
+
+const UsageEditor = ({ value, onChange }: { value: UsagePricing; onChange: (u: UsagePricing) => void }) => {
+  const rates = value.rates
+  const setRate = <K extends keyof UsageRates>(k: K, v: UsageRates[K]) => onChange({ ...value, rates: { ...rates, [k]: v } })
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 p-4">
+      <p className="text-xs text-stone-500">
+        No monthly price: every feature and unlimited staff, with a fee on each month’s sales, billed after the month. Rates are a
+        percent of completed sales after discounts.
+      </p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Store POS, by the product’s fee type</p>
+      <FormGrid>
+        {FEE_CLASSES.map((c) => (
+          <RateInput
+            key={c.key}
+            id={`rate-retail-${c.key}`}
+            label={c.label}
+            hint={c.examples}
+            value={rates.retail[c.key]}
+            onChange={(n) => setRate('retail', { ...rates.retail, [c.key]: n })}
+          />
+        ))}
+      </FormGrid>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Other modules</p>
+      <FormGrid>
+        <RateInput id="rate-eatery" label="Eatery orders" value={rates.eatery} onChange={(n) => setRate('eatery', n)} />
+        <RateInput id="rate-amusement" label="Amusement tickets & counter" value={rates.amusement} onChange={(n) => setRate('amusement', n)} />
+        <RateInput id="rate-rent" label="Rent collected" value={rates.rent} onChange={(n) => setRate('rent', n)} />
+        <RateInput id="rate-stays" label="Short-stay bookings" value={rates.shortStays} onChange={(n) => setRate('shortStays', n)} />
+      </FormGrid>
+      <FormGrid>
+        <Field label="Monthly minimum" hint="Charged even if fees come to less" htmlFor="usage-min">
+          <Input
+            id="usage-min"
+            type="number"
+            min={0}
+            prefix="₵"
+            value={value.minimum}
+            onChange={(e) => onChange({ ...value, minimum: Math.max(0, toNum(e.target.value)) })}
+          />
+        </Field>
+        <Field
+          label="Monthly cap"
+          hint="Empty = no cap"
+          error={value.cap !== null && value.cap < value.minimum ? 'Must be at least the minimum' : undefined}
+          htmlFor="usage-cap"
+        >
+          <Input
+            id="usage-cap"
+            type="number"
+            min={0}
+            prefix="₵"
+            placeholder="No cap"
+            value={value.cap ?? ''}
+            onChange={(e) => onChange({ ...value, cap: e.target.value === '' ? null : Math.max(0, toNum(e.target.value)) })}
+          />
+        </Field>
+      </FormGrid>
+    </div>
+  )
+}
 
 // ── Plan drawer (edits the draft) ────────────────────────────────────────────
 
@@ -52,7 +131,8 @@ const PlanDrawer = ({
       : isNew && takenIds.includes(p.id)
         ? 'Already used'
         : ''
-  const valid = p.name.trim().length > 0 && !idError
+  const usageError = p.usage && p.usage.cap !== null && p.usage.cap < p.usage.minimum ? 'The cap must be at least the minimum' : ''
+  const valid = p.name.trim().length > 0 && !idError && !usageError
   const saving = yearlySavings(p)
 
   return (
@@ -82,7 +162,13 @@ const PlanDrawer = ({
           <Button
             disabled={!valid}
             onClick={() =>
-              onApply({ ...p, name: p.name.trim(), tagline: p.tagline.trim(), limits: { staff: unlimited ? null : p.limits.staff } })
+              onApply({
+                ...p,
+                name: p.name.trim(),
+                tagline: p.tagline.trim(),
+                limits: { staff: unlimited || p.usage ? null : p.limits.staff },
+                ...(p.usage ? { monthlyPrice: 0, yearlyPrice: 0, trialDays: 0, features: [...FEATURE_KEYS] } : {}),
+              })
             }
           >
             Apply
@@ -120,6 +206,19 @@ const PlanDrawer = ({
         <Field label="Tagline" htmlFor="plan-tagline">
           <Input id="plan-tagline" value={p.tagline} maxLength={120} onChange={(e) => set('tagline', e.target.value)} />
         </Field>
+        <Segmented
+          ariaLabel="Plan pricing"
+          value={p.usage ? 'usage' : 'fixed'}
+          onChange={(v) => set('usage', v === 'usage' ? (p.usage ?? DEFAULT_USAGE_PRICING) : undefined)}
+          options={[
+            { value: 'fixed', label: 'Fixed price' },
+            { value: 'usage', label: 'Pay as you sell' },
+          ]}
+        />
+        {p.usage ? (
+          <UsageEditor value={p.usage} onChange={(u) => set('usage', u)} />
+        ) : (
+          <>
         <FormGrid>
           <Field label="Monthly price" htmlFor="plan-monthly">
             <Input
@@ -173,8 +272,10 @@ const PlanDrawer = ({
             />
           </Field>
         </FormGrid>
+          </>
+        )}
         <div className="rounded-2xl border border-stone-200 p-4 flex flex-col gap-4">
-          <Toggle checked={unlimited} onChange={setUnlimited} label="Unlimited staff" />
+          {!p.usage && <Toggle checked={unlimited} onChange={setUnlimited} label="Unlimited staff" />}
           <Toggle
             checked={!!p.highlighted}
             onChange={(v) => set('highlighted', v)}
@@ -302,15 +403,31 @@ export default function PlansPage() {
                 Edit
               </Button>
             </div>
-            <p className="mt-4">
-              <span className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">{cedis(p.monthlyPrice)}</span>
-              <span className="text-sm text-stone-500"> /month</span>
-            </p>
-            <p className="text-xs text-stone-500">{cedis(p.yearlyPrice)} /year</p>
+            {p.usage ? (
+              <>
+                <p className="mt-4">
+                  <span className="text-3xl font-extrabold tracking-tight text-stone-900">Fee on sales</span>
+                </p>
+                <p className="text-xs text-stone-500">
+                  Store {percent(Math.min(...Object.values(p.usage.rates.retail)))}–
+                  {percent(Math.max(...Object.values(p.usage.rates.retail)))} · eatery {percent(p.usage.rates.eatery)} · min{' '}
+                  {cedis(p.usage.minimum)}
+                  {p.usage.cap !== null ? ` · cap ${cedis(p.usage.cap)}` : ''}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-4">
+                  <span className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">{cedis(p.monthlyPrice)}</span>
+                  <span className="text-sm text-stone-500"> /month</span>
+                </p>
+                <p className="text-xs text-stone-500">{cedis(p.yearlyPrice)} /year</p>
+              </>
+            )}
             <dl className="mt-4 pt-4 border-t border-stone-100 grid grid-cols-3 gap-2 text-center">
               {[
-                { label: 'Staff', value: p.limits.staff ?? '∞' },
-                { label: 'Trial', value: p.trialDays ? `${p.trialDays}d` : '—' },
+                { label: 'Staff', value: p.usage ? '∞' : (p.limits.staff ?? '∞') },
+                { label: 'Trial', value: p.trialDays && !p.usage ? `${p.trialDays}d` : '—' },
                 { label: 'On it', value: subscriberCount.get(p.id) ?? 0 },
               ].map((s) => (
                 <div key={s.label}>
@@ -358,7 +475,7 @@ export default function PlansPage() {
                 </td>
                 {draft.plans.map((p) => (
                   <td key={p.id} className="py-2.5 px-3 text-center font-semibold text-stone-900 tabular-nums">
-                    {p.limits.staff ?? 'Unlimited'}
+                    {p.usage ? 'Unlimited' : (p.limits.staff ?? 'Unlimited')}
                   </td>
                 ))}
               </tr>
@@ -385,7 +502,8 @@ export default function PlansPage() {
                           <span className="block text-[11px] text-stone-400">{f.description}</span>
                         </td>
                         {draft.plans.map((p) => {
-                          const on = p.features.includes(f.key)
+                          // Pay as you sell always includes every feature.
+                          const on = !!p.usage || p.features.includes(f.key)
                           return (
                             <td key={p.id} className="py-1.5 px-3 text-center">
                               <button
@@ -393,6 +511,8 @@ export default function PlansPage() {
                                 role="switch"
                                 aria-checked={on}
                                 aria-label={`${f.label} on ${p.name}`}
+                                disabled={!!p.usage}
+                                title={p.usage ? 'Pay as you sell includes every feature' : undefined}
                                 onClick={() => toggleFeature(p.id, f.key)}
                                 className={cn(
                                   'h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors',

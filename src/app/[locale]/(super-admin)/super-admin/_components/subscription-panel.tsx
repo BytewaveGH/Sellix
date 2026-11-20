@@ -7,7 +7,8 @@ import { CalendarPlus, Check, CircleDashed, CreditCard, History, Inbox, Receipt,
 import { Button, Card, ErrorNote, SectionTitle, Skeleton } from '@/components/kit/ui'
 import { accessFor, cedis, cycleLabel, priceFor } from '@/lib/subscription/access'
 import { BillingPill, METHOD_LABELS, PeriodBar, accessLine, shortDate } from '@/components/billing/bits'
-import { useBillingActions, useCatalog, useSubscriptions } from '../_logics/billing'
+import { UsageBillCard } from '@/components/billing/usage'
+import { useBillingActions, useCatalog, useSubscriptions, useUsage } from '../_logics/billing'
 import type { TenantRecord } from '../_logics/types'
 import { BillingDrawers, type BillingDrawer } from './billing-forms'
 import { timeAgo } from './bits'
@@ -18,6 +19,9 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
   const actions = useBillingActions()
   const [drawer, setDrawer] = useState<BillingDrawer>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const current = subs.data.find((s) => s.tenantId === tenant.id)
+  const onUsagePlan = !!catalog.data?.plans.find((p) => p.id === current?.planId)?.usage
+  const usage = useUsage(tenant.id, onUsagePlan)
 
   if (catalog.isLoading || subs.isLoading) return <Skeleton className="h-64" />
   const error = catalog.error ?? subs.error
@@ -50,8 +54,14 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-stone-900">
-              Asked for {requested.name} ({sub.request.cycle}) · {cedis(priceFor(requested, sub.request.cycle))}/
-              {cycleLabel(sub.request.cycle)}
+              {requested.usage ? (
+                <>Asked for {requested.name} · fee on sales</>
+              ) : (
+                <>
+                  Asked for {requested.name} ({sub.request.cycle}) · {cedis(priceFor(requested, sub.request.cycle))}/
+                  {cycleLabel(sub.request.cycle)}
+                </>
+              )}
             </p>
             <p className="text-xs text-stone-500">
               {timeAgo(sub.request.requestedAt)}
@@ -93,12 +103,29 @@ export const SubscriptionPanel = ({ tenant }: { tenant: TenantRecord }) => {
                 </div>
                 <p className="text-sm text-stone-500 mt-1">{accessLine(access, sub)}</p>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-extrabold text-stone-900 tabular-nums">{cedis(priceFor(access.plan, sub.cycle))}</p>
-                <p className="text-xs text-stone-500">per {cycleLabel(sub.cycle)}</p>
-              </div>
+              {access.plan.usage ? (
+                <div className="text-right">
+                  <p className="text-sm font-bold text-stone-900">Fee on sales</p>
+                  <p className="text-xs text-stone-500">Billed after each month</p>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <p className="text-2xl font-extrabold text-stone-900 tabular-nums">{cedis(priceFor(access.plan, sub.cycle))}</p>
+                  <p className="text-xs text-stone-500">per {cycleLabel(sub.cycle)}</p>
+                </div>
+              )}
             </div>
             <PeriodBar sub={sub} access={access} className="mt-5" />
+            {access.plan.usage && (
+              <UsageBillCard
+                className="mt-5"
+                pricing={access.plan.usage}
+                report={usage.data}
+                periodStart={sub.currentPeriodStart}
+                periodEnd={access.endsAt?.toISOString() ?? null}
+                audience="platform"
+              />
+            )}
             <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-stone-100">
               <Button icon={CreditCard} onClick={() => setDrawer('payment')}>
                 Record payment

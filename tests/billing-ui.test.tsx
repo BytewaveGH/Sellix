@@ -36,7 +36,7 @@ const history = (...steps: [BillingAction, number][]) =>
     null
   )
 
-let response: { status: number; subscription: Subscription | null } = { status: 200, subscription: null }
+let response: { status: number; subscription: Subscription | null; usage?: unknown } = { status: 200, subscription: null }
 const posts: any[] = []
 
 beforeEach(() => {
@@ -56,7 +56,7 @@ beforeEach(() => {
         return new Response(JSON.stringify({ data: response.subscription }))
       }
       if (response.status !== 200) return new Response(JSON.stringify({ message: 'down' }), { status: response.status })
-      return new Response(JSON.stringify({ data: { subscription: response.subscription, catalog } }))
+      return new Response(JSON.stringify({ data: { subscription: response.subscription, catalog, usage: response.usage ?? null } }))
     })
   )
 })
@@ -183,5 +183,31 @@ describe('owner billing page', () => {
     })
     await waitFor(() => expect(posts).toEqual([{ type: 'request-plan', planId: 'growth', cycle: 'monthly', note: 'Paying Friday' }]))
     expect(await screen.findByText(/The Bytewave team will confirm it/)).toBeTruthy()
+  })
+
+  it('pay as you sell: shows the fee so far and the store rates', async () => {
+    auth.user = { ...auth.user, appType: 'retail' }
+    response = {
+      status: 200,
+      subscription: history([{ type: 'assign', planId: 'pay-as-you-sell', cycle: 'monthly' }, 10]),
+      usage: {
+        periodStart: new Date(Date.now() - 10 * DAY).toISOString(),
+        periodEnd: new Date(Date.now() + 20 * DAY).toISOString(),
+        sales: { retail: { staples: 20_000, general: 30_000 } },
+        updatedAt: new Date().toISOString(),
+      },
+    }
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <BillingPage />
+      </QueryClientProvider>
+    )
+    expect(await screen.findByRole('heading', { name: 'Pay as you sell' })).toBeTruthy()
+    expect(screen.getByText('No monthly price')).toBeTruthy()
+    expect(screen.getByText(/^Next bill on /)).toBeTruthy()
+    // 0.5% of ₵20,000 + 1% of ₵30,000
+    expect(screen.getByLabelText('Fee so far').textContent).toBe('₵400')
+    expect(screen.getAllByText('High margin').length).toBeGreaterThan(0)
+    expect(screen.getByText('Unlimited on your plan')).toBeTruthy()
   })
 })

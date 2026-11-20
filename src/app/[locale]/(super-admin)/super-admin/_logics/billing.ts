@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import type { BillingAction } from '@/lib/subscription/billing'
 import { billingAttention, billingRows } from '@/lib/subscription/insights'
 import type { Catalog, Subscription } from '@/lib/subscription/types'
+import type { UsageReport } from '@/lib/subscription/usage'
 import { call, useTenants } from './api'
 
 const KEY = ['platform', 'billing'] as const
@@ -19,6 +20,7 @@ export const billingApi = {
   saveCatalog: (catalog: Catalog) =>
     call<Catalog>('/api/platform/billing/catalog', { method: 'PUT', body: JSON.stringify(catalog) }, 'Couldn’t save plans'),
   subscriptions: () => call<Subscription[]>('/api/platform/subscriptions', undefined, 'Couldn’t load subscriptions').then((d) => d ?? []),
+  usage: (tenantId: number) => call<UsageReport | null>(`/api/platform/tenants/${tenantId}/usage`, undefined, 'Couldn’t load sales for billing'),
   act: (tenantId: number, action: BillingAction) =>
     call<Subscription>(
       `/api/platform/tenants/${tenantId}/subscription`,
@@ -28,6 +30,16 @@ export const billingApi = {
 }
 
 export const useCatalog = () => useQuery({ queryKey: [...KEY, 'catalog'], queryFn: billingApi.catalog, staleTime: 60_000, retry: false })
+
+// Pay as you sell: one business's sales this billing period (null = not counted yet).
+export const useUsage = (tenantId: number, enabled: boolean) =>
+  useQuery({
+    queryKey: [...KEY, 'usage', tenantId],
+    queryFn: () => billingApi.usage(tenantId),
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+  })
 
 export const useSubscriptions = () => {
   const q = useQuery({ queryKey: [...KEY, 'subscriptions'], queryFn: billingApi.subscriptions, staleTime: 30_000, retry: false })

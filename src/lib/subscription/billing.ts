@@ -7,6 +7,7 @@ import * as z from 'zod'
 import { FEATURE_KEYS } from './features'
 import { accessFor, cedis, periodEnd } from './access'
 import type { BillingCycle, BillingEvent, Catalog, Plan, Subscription } from './types'
+import { isUsagePlan } from './usage'
 
 export class BillingError extends Error {
   constructor(
@@ -97,6 +98,26 @@ export const applyAction = (
 
   if (action.type === 'assign') {
     const plan = findPlan(catalog, action.planId)
+    // Pay as you sell is billed after the month, from its sales: it starts
+    // active, monthly, with the first bill due a month from now. No trial.
+    if (plan.usage) {
+      const end = addMonths(now, 1)
+      return log(
+        {
+          tenantId,
+          planId: plan.id,
+          cycle: 'monthly',
+          status: 'active',
+          currentPeriodStart: iso,
+          currentPeriodEnd: end.toISOString(),
+          cancelAtPeriodEnd: false,
+          payments: current?.payments ?? [],
+          events: current?.events ?? [],
+          updatedAt: iso,
+        },
+        `${plan.name} — first bill on ${day(end)}`
+      )
+    }
     const trial = action.trialDays > 0
     const end = trial ? addDays(now, action.trialDays) : now
     return log(
@@ -122,12 +143,28 @@ export const applyAction = (
   if (!current) throw new BillingError(404, 'This business has no subscription yet')
   const sub = current
   const access = accessFor(sub, catalog.plans, catalog.settings, now)
+  const currentPlan = catalog.plans.find((p) => p.id === sub.planId)
+  // Moving onto pay as you sell starts its first month today. Time already
+  // paid on a fixed plan isn't carried over (the platform settles it by hand).
+  const startUsage = (s: Subscription, plan: Plan): Subscription => ({
+    ...s,
+    planId: plan.id,
+    cycle: 'monthly',
+    status: 'active',
+    trialEndsAt: undefined,
+    currentPeriodStart: iso,
+    currentPeriodEnd: addMonths(now, 1).toISOString(),
+    cancelAtPeriodEnd: false,
+    canceledAt: undefined,
+    request: undefined,
+  })
 
   switch (action.type) {
     case 'change-plan': {
       const plan = findPlan(catalog, action.planId, { allowArchived: action.planId === sub.planId })
-      const nextCycle = action.cycle ?? sub.cycle
+      const nextCycle = plan.usage ? 'monthly' : (action.cycle ?? sub.cycle)
       if (plan.id === sub.planId && nextCycle === sub.cycle) throw new BillingError(409, `Already on ${plan.name} (${nextCycle})`)
+      if (plan.usage && !isUsagePlan(currentPlan)) return log(startUsage(sub, plan), `Plan changed to ${plan.name} — first bill on ${day(addMonths(now, 1))}`)
       return log({ ...sub, planId: plan.id, cycle: nextCycle, request: undefined }, `Plan changed to ${plan.name} (${nextCycle})`)
     }
 
@@ -138,15 +175,19 @@ export const applyAction = (
       // or a cancellation it starts today.
       const continues = end && (access.state === 'active' || access.state === 'past_due' || access.state === 'trialing')
       const start = continues ? end : now
-      const until = addCycle(start, sub.cycle, action.periods)
+      // Pay as you sell is paid after the month: the payment settles the
+      // month just billed, and the next month runs on from its end.
+      const usage = isUsagePlan(currentPlan)
+      const until = addCycle(start, sub.cycle, usage ? 1 : action.periods)
+      const covers = usage ? { periodStart: sub.currentPeriodStart, periodEnd: (end ?? now).toISOString() } : null
       const payment = {
         id: (ctx.newId ?? randomId)(),
         amount: action.amount,
         method: action.method,
         reference: action.reference || undefined,
         paidAt: action.paidAt ?? iso,
-        periodStart: start.toISOString(),
-        periodEnd: until.toISOString(),
+        periodStart: covers?.periodStart ?? start.toISOString(),
+        periodEnd: covers?.periodEnd ?? until.toISOString(),
         planId: sub.planId,
         cycle: sub.cycle,
       }
@@ -161,7 +202,9 @@ export const applyAction = (
           canceledAt: undefined,
           payments: [...sub.payments, payment],
         },
-        `${cedis(action.amount)} by ${METHOD_LABEL[action.method]}${action.reference ? ` (${action.reference})` : ''} — paid to ${day(until)}`
+        `${cedis(action.amount)} by ${METHOD_LABEL[action.method]}${action.reference ? ` (${action.reference})` : ''} — ${
+          covers ? `bill for ${day(new Date(covers.periodStart))} – ${day(new Date(covers.periodEnd))} paid` : `paid to ${day(until)}`
+        }`
       )
     }
 
@@ -204,16 +247,19 @@ export const applyAction = (
 
     case 'request-plan': {
       const plan = findPlan(catalog, action.planId)
-      if (plan.id === sub.planId && action.cycle === sub.cycle) throw new BillingError(409, `You’re already on ${plan.name}`)
+      const wanted = plan.usage ? 'monthly' : action.cycle
+      if (plan.id === sub.planId && wanted === sub.cycle) throw new BillingError(409, `You’re already on ${plan.name}`)
       return log(
-        { ...sub, request: { planId: plan.id, cycle: action.cycle, note: action.note || undefined, requestedAt: iso } },
-        `Requested ${plan.name} (${action.cycle})`
+        { ...sub, request: { planId: plan.id, cycle: wanted, note: action.note || undefined, requestedAt: iso } },
+        plan.usage ? `Requested ${plan.name}` : `Requested ${plan.name} (${wanted})`
       )
     }
 
     case 'approve-request': {
       if (!sub.request) throw new BillingError(409, 'There’s no pending request')
       const plan = findPlan(catalog, sub.request.planId)
+      if (plan.usage && !isUsagePlan(currentPlan))
+        return log(startUsage(sub, plan), `Request approved — now on ${plan.name}, first bill on ${day(addMonths(now, 1))}`)
       return log(
         { ...sub, planId: plan.id, cycle: sub.request.cycle, request: undefined },
         `Request approved — now on ${plan.name} (${sub.request.cycle})`
@@ -229,6 +275,22 @@ export const applyAction = (
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
+// Percent of sales: 0–20%.
+const rate = z.number().min(0, 'Rates can’t be negative').max(20, 'Rates above 20% aren’t allowed')
+const UsageSchema = z
+  .object({
+    rates: z.object({
+      retail: z.object({ zero: rate, staples: rate, general: rate, high: rate }),
+      eatery: rate,
+      amusement: rate,
+      rent: rate,
+      shortStays: rate,
+    }),
+    minimum: z.number().min(0).max(100_000),
+    cap: z.number().min(0).max(1_000_000).nullable(),
+  })
+  .refine((u) => u.cap === null || u.cap >= u.minimum, 'The monthly cap must be at least the minimum')
+
 const PlanSchema = z.object({
   id: z
     .string()
@@ -243,6 +305,7 @@ const PlanSchema = z.object({
   trialDays: z.number().int().min(0).max(365),
   highlighted: z.boolean().optional(),
   archived: z.boolean().optional(),
+  usage: UsageSchema.optional(),
 })
 
 const CatalogSchema = z.object({
@@ -260,7 +323,14 @@ const CatalogSchema = z.object({
 export const parseCatalog = (input: unknown, inUse: Iterable<string> = []): Catalog => {
   const r = CatalogSchema.safeParse(input)
   if (!r.success) throw new BillingError(400, r.error.issues[0]?.message ?? 'Invalid catalog')
-  const catalog = r.data as Catalog
+  const parsed = r.data as Catalog
+  // Pay as you sell: every feature, unlimited staff, no price or trial.
+  const catalog: Catalog = {
+    ...parsed,
+    plans: parsed.plans.map((p) =>
+      p.usage ? { ...p, monthlyPrice: 0, yearlyPrice: 0, limits: { staff: null }, features: [...FEATURE_KEYS], trialDays: 0 } : p
+    ),
+  }
   const ids = catalog.plans.map((p) => p.id)
   if (new Set(ids).size !== ids.length) throw new BillingError(400, 'Two plans share an id')
   if (!catalog.plans.some((p) => !p.archived)) throw new BillingError(400, 'Keep at least one plan on offer')
