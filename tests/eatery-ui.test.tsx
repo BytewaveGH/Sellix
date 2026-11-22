@@ -395,11 +395,14 @@ describe('eatery platform (local data)', () => {
     expect(screen.getByRole('radio', { name: 'Charged for every portion' }).getAttribute('aria-checked')).toBe('true')
     fireEvent.click(screen.getByRole('radio', { name: 'Charged once per line' }))
     expect(screen.getByText(/the extra once/)).toBeTruthy()
+    // Egg × 3: Max now counts portions, so it can go past the number of choices.
+    fireEvent.click(screen.getByRole('radio', { name: 'More than one of each' }))
+    expect(screen.getByText(/Max \(10\) counts every one/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add to menu' }))
     await waitFor(async () => {
       const saved = (await owner.list('items')).find((i) => i.name === 'TZ')!
-      expect(saved.optionGroups[1]).toMatchObject({ name: 'Proteins', kind: 'addon', chargeOnce: true })
+      expect(saved.optionGroups[1]).toMatchObject({ name: 'Proteins', kind: 'addon', chargeOnce: true, repeat: true, max: 10 })
       expect(saved.optionGroups[0].chargeOnce).toBeUndefined()
     })
   })

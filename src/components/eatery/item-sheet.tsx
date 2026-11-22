@@ -4,7 +4,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Minus, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { choiceProblems, defaultChoices, formatMoney, groupRule, lineAmount, linePrice, priceGroup } from '@/lib/eatery/menu'
+import {
+  choiceProblems,
+  countOf,
+  defaultChoices,
+  formatMoney,
+  groupRule,
+  lineAmount,
+  linePrice,
+  priceGroup,
+  repeatable,
+} from '@/lib/eatery/menu'
 import type { MenuItem, OrderLineInput, StorefrontBundle } from '@/lib/eatery/types'
 import { ItemArt, TagList, ThemeScope } from './theme-scope'
 
@@ -59,6 +69,15 @@ export const ItemSheet = ({
       if (cur.includes(choiceId)) return { ...c, [groupId]: cur.filter((x) => x !== choiceId) }
       if (cur.length >= max) return c
       return { ...c, [groupId]: [...cur, choiceId] }
+    })
+
+  // Extras taken more than once (Egg × 3): one more, or one less.
+  const step = (groupId: string, choiceId: string, by: 1 | -1, max: number) =>
+    setChoices((c) => {
+      const cur = c[groupId] ?? []
+      if (by === 1) return cur.length >= max ? c : { ...c, [groupId]: [...cur, choiceId] }
+      const at = cur.lastIndexOf(choiceId)
+      return at < 0 ? c : { ...c, [groupId]: cur.filter((_, i) => i !== at) }
     })
 
   const add = () => {
@@ -168,6 +187,39 @@ export const ItemSheet = ({
                     <div className="mt-2 grid gap-2">
                       {g.choices.map((c) => {
                         const checked = picked.includes(c.id)
+                        const price = c.soldOut ? 'Sold out' : delta(c.priceDelta, currency)
+                        if (!single && repeatable(g)) {
+                          const n = countOf(picked, c.id)
+                          return (
+                            <div key={c.id} className="e-choice" role="group" aria-label={c.name}>
+                              <span className="flex-1 font-semibold">{c.name}</span>
+                              <span className="text-sm e-muted">{price}</span>
+                              <button
+                                type="button"
+                                onClick={() => step(g.id, c.id, -1, g.max)}
+                                disabled={n === 0}
+                                className="flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] e-focus disabled:opacity-40"
+                                style={{ borderColor: 'var(--e-border)' }}
+                                aria-label={`One less ${c.name}`}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
+                              <span className="w-6 text-center font-extrabold tabular-nums" aria-live="polite" aria-label={`${n} ${c.name}`}>
+                                {n}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => step(g.id, c.id, 1, g.max)}
+                                disabled={c.soldOut || full}
+                                className="flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] e-focus disabled:opacity-40"
+                                style={{ borderColor: 'var(--e-border)' }}
+                                aria-label={`One more ${c.name}`}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )
+                        }
                         return (
                           <label key={c.id} className="e-choice">
                             <input

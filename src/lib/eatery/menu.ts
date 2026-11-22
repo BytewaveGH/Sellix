@@ -155,6 +155,7 @@ export const choiceProblems = (item: MenuItem, choices: Record<string, string[]>
     const picked = (choices[g.id] ?? []).filter((id) => g.choices.some((c) => c.id === id && !c.soldOut))
     if (picked.length < g.min) problems[g.id] = g.min === 1 ? `Choose a ${g.name.toLowerCase()}` : `Choose at least ${g.min}`
     else if (picked.length > g.max) problems[g.id] = `Choose at most ${g.max}`
+    else if (!repeatable(g) && new Set(picked).size < picked.length) problems[g.id] = 'Choose each one only once'
   }
   for (const s of item.combo?.slots ?? []) {
     if (!s.choices.some((c) => c.itemId === comboPicks[s.id])) problems[s.id] = `Choose your ${s.name.toLowerCase()}`
@@ -177,6 +178,12 @@ export interface LinePrice {
 
 // Extras groups charged once per line rather than per portion.
 export const chargedOnce = (g: OptionGroup) => g.kind === 'addon' && !!g.chargeOnce
+
+// Extras groups where the same extra can be taken several times (Egg × 3).
+export const repeatable = (g: OptionGroup) => g.kind === 'addon' && !!g.repeat
+
+// How many times a choice was picked (repeated ids = more than one).
+export const countOf = (ids: string[] | undefined, id: string) => (ids ?? []).filter((x) => x === id).length
 
 // Ids of an item's groups charged once per line (for ingredient use).
 export const onceGroupIds = (item: MenuItem | undefined) =>
@@ -220,7 +227,7 @@ export const linePrice = (
   }
 }
 
-// "Regular · + Fish small". With more than one portion, extras charged once
+// "Regular · + Fish small, Egg × 3". With more than one portion, extras charged once
 // for the line say so ("+ Fish small (once)"), so the kitchen makes one and
 // the receipt adds up.
 export const choiceSummary = (
@@ -234,7 +241,15 @@ export const choiceSummary = (
     if (picked !== undefined) parts.push(itemsById?.get(picked)?.name ?? `#${picked}`)
   }
   for (const g of item.optionGroups) {
-    const names = (line.choices[g.id] ?? []).map((id) => g.choices.find((c) => c.id === id)?.name).filter(Boolean) as string[]
+    // "Egg × 3, Fish" — each extra once, with how many when more than one.
+    const ids = line.choices[g.id] ?? []
+    const names = Array.from(new Set(ids))
+      .map((id) => {
+        const name = g.choices.find((c) => c.id === id)?.name
+        const n = countOf(ids, id)
+        return name && (n > 1 ? `${name} × ${n}` : name)
+      })
+      .filter(Boolean) as string[]
     if (!names.length) continue
     const once = chargedOnce(g) && (line.quantity ?? 1) > 1 ? ' (once)' : ''
     parts.push(g.kind === 'addon' ? `+ ${names.join(', ')}${once}` : names.join(', '))
