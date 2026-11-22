@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/kit/ui'
 import { Drawer, Field, FormGrid, FormSection, Input, Segmented, Select, Textarea, Toggle, toNum } from '@/components/kit/form'
 import { useEateryActions } from '@/lib/eatery/hooks'
-import { DAY_SHORT, formatMoney, groupRule, priceGroup, round2 } from '@/lib/eatery/menu'
+import { DAY_SHORT, formatMoney, groupRule, priceGroup, repeatable, round2 } from '@/lib/eatery/menu'
 import { ALL_OPTION_TEMPLATES, optionGroupFromTemplate, presetFor, uid } from '@/lib/eatery/presets'
 import type {
   ComboSlot,
@@ -287,7 +287,7 @@ const OptionGroupEditor = ({
               ...group,
               kind,
               ...(kind === 'variant'
-                ? { min: 1, max: 1, chargeOnce: undefined }
+                ? { min: 1, max: 1, chargeOnce: undefined, repeat: undefined }
                 : { min: 0, max: Math.max(1, Math.min(group.choices.length, 3)) }),
             })
           }
@@ -335,6 +335,29 @@ const OptionGroupEditor = ({
               ? 'Quantity 4 with one extra: the item is charged 4 times, the extra once (e.g. TZ × 4 + one fish).'
               : 'Quantity 4 with one extra: the item and the extra are both charged 4 times (e.g. 4 pizzas, each with cheese).'}
           </p>
+          <div className="mt-2">
+            <Segmented
+              ariaLabel={`${group.name || 'Group'} how many of each`}
+              value={group.repeat ? 'many' : 'one'}
+              onChange={(v) =>
+                onChange(
+                  v === 'many'
+                    ? // "Max" now counts every portion: leave room for several of one extra.
+                      { ...group, repeat: true, max: Math.max(group.max, 10) }
+                    : { ...group, repeat: undefined, max: Math.max(1, Math.min(group.max, group.choices.length || 1)) }
+                )
+              }
+              options={[
+                { value: 'one', label: 'One of each' },
+                { value: 'many', label: 'More than one of each' },
+              ]}
+            />
+            <p className="mt-1 text-[11px] text-stone-500">
+              {group.repeat
+                ? `Customers tap + to take an extra several times (e.g. Egg × 3). Max (${group.max}) counts every one.`
+                : 'Each extra is a tick box: taken once or not at all.'}
+            </p>
+          </div>
         </div>
       )}
       {pricing && onPricing && (
@@ -439,7 +462,8 @@ const groupProblem = (g: OptionGroup) =>
       ? `“${g.name}” needs named choices`
       : g.min > g.max
         ? `“${g.name}”: minimum is more than maximum`
-        : g.max > g.choices.length
+        : // With "more than one of each", Max counts portions, not choices (Egg × 3).
+          !repeatable(g) && g.max > g.choices.length
           ? `“${g.name}”: maximum is more than the number of choices`
           : null
 

@@ -113,6 +113,11 @@ export interface OptionGroup {
   // whatever the quantity (TZ × 4 + one fish = 4 × TZ + 1 fish). Absent or
   // false: charged for every portion, as before.
   chargeOnce?: boolean
+  // Extras only. true: a customer can take the same extra more than once
+  // (three eggs at ₵3 each = Egg × 3, ₵9). Each one is
+  // its id again in the line's choices: ["egg", "egg", "egg"]. `max` counts
+  // every one. Absent or false: each extra at most once, as before.
+  repeat?: boolean
 }
 
 // A combo: fixed price, the customer picks one item per slot (main, side, drink).
