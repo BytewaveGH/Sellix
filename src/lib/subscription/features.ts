@@ -90,6 +90,22 @@ export const FEATURES = [
   },
 ] as const satisfies readonly { key: string; module: AppType; label: string; description: string; routes: readonly string[] }[]
 
+// On every plan, never locked: listed on plan cards and in the plan editor so
+// owners know they have them. Internet is the biggest problem for shops, so
+// the desktop app and offline selling are never an upsell.
+export const CORE_FEATURES = [
+  {
+    key: 'core.desktop',
+    label: 'Windows desktop app',
+    description: 'Installs on the shop PC and keeps selling when the internet is down',
+  },
+  {
+    key: 'core.offline',
+    label: 'Offline selling & sync',
+    description: 'Sales and orders are kept on the device and sent once the internet is back',
+  },
+] as const
+
 export type FeatureKey = (typeof FEATURES)[number]['key']
 export type Feature = (typeof FEATURES)[number]
 

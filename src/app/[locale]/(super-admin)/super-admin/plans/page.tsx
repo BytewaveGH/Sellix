@@ -8,7 +8,7 @@ import { Button, Card, ErrorNote, LoadingGrid, PageHeader, SectionTitle } from '
 import { Drawer, Field, FormGrid, Input, Segmented, Textarea, Toggle, toNum } from '@/components/kit/form'
 import { DEFAULT_USAGE_PRICING, FEE_CLASSES, percent, type UsagePricing, type UsageRates } from '@/lib/subscription/usage'
 import { cedis, yearlySavings } from '@/lib/subscription/access'
-import { FEATURE_KEYS, featuresFor, type FeatureKey } from '@/lib/subscription/features'
+import { CORE_FEATURES, FEATURE_KEYS, featuresFor, type FeatureKey } from '@/lib/subscription/features'
 import { plansInUse } from '@/lib/subscription/insights'
 import type { Catalog, Plan } from '@/lib/subscription/types'
 import { VERTICALS } from '@/lib/verticals'
@@ -479,6 +479,34 @@ export default function PlansPage() {
                   </td>
                 ))}
               </tr>
+              <tr>
+                <td
+                  colSpan={draft.plans.length + 1}
+                  className="pt-4 pb-1.5 pl-5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-400"
+                >
+                  Core · every plan
+                </td>
+              </tr>
+              {CORE_FEATURES.map((f) => (
+                <tr key={f.key} className="border-b border-stone-100">
+                  <td className="py-2 pl-5 pr-4">
+                    <span className="block text-stone-800">{f.label}</span>
+                    <span className="block text-[11px] text-stone-400">{f.description}</span>
+                  </td>
+                  {draft.plans.map((p) => (
+                    <td key={p.id} className="py-1.5 px-3 text-center">
+                      <span
+                        className="h-8 w-8 rounded-lg inline-flex items-center justify-center bg-emerald-50 text-emerald-600"
+                        role="img"
+                        aria-label={`${f.label} on ${p.name}: always included`}
+                        title="Core — included on every plan"
+                      >
+                        <Check className="h-4 w-4" />
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
               {VERTICALS.map((v) => {
                 const fs = featuresFor(v.value)
                 if (!fs.length) return null
@@ -561,6 +589,21 @@ export default function PlansPage() {
               value={draft.settings.supportContact}
               maxLength={200}
               onChange={(e) => setSetting('supportContact', e.target.value)}
+            />
+          </Field>
+          <Field
+            label="Desktop app download link"
+            hint="Where owners get the Windows installer (core on every plan), e.g. a Google Drive or website link. Must start with https://"
+            htmlFor="desktop-url"
+            className="lg:col-span-3"
+          >
+            <Input
+              id="desktop-url"
+              type="url"
+              value={draft.settings.desktopDownloadUrl ?? ''}
+              maxLength={500}
+              placeholder="https://…/Sellix POS Setup.exe"
+              onChange={(e) => setSetting('desktopDownloadUrl', e.target.value)}
             />
           </Field>
           <Field

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { ArrowDown, ArrowUp, BadgePercent, Clock, Layers, Pencil, Plus, Trash2, UtensilsCrossed } from 'lucide-react'
+import { ArrowDown, ArrowUp, BadgePercent, Clock, Download, Layers, Pencil, Plus, Trash2, Upload, UtensilsCrossed } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button, Card, EmptyState, PageHeader, SectionTitle } from '@/components/kit/ui'
 import { ConfirmDialog } from '@/components/kit/form'
@@ -12,6 +12,9 @@ import { ItemArt, ThemeScope } from '@/components/eatery/theme-scope'
 import { fromPrice } from '@/components/eatery/menu-view'
 import { EateryFrame, RestaurantSwitcher } from '../_components/frame'
 import { CategoryForm, ItemForm, PromotionForm } from '../_components/menu-forms'
+import { MenuImport } from '../_components/menu-import'
+import { fileNameFor, itemsToCsv } from '@/lib/eatery/menu-csv'
+import { downloadCsv } from '@/lib/eatery/sales'
 
 const STATUS_CYCLE: { value: ItemStatus; label: string; className: string }[] = [
   { value: 'available', label: 'Available', className: 'bg-emerald-50 text-emerald-700' },
@@ -28,6 +31,7 @@ export default function MenuPage() {
   const [itemForm, setItemForm] = useState<{ item: MenuItem | null; categoryId?: number } | null>(null)
   const [promoForm, setPromoForm] = useState<{ promotion: Promotion | null } | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
+  const [importInto, setImportInto] = useState<MenuCategory | null>(null)
 
   return (
     <EateryFrame>
@@ -188,7 +192,26 @@ export default function MenuPage() {
                             ) : null}
                           </p>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={Upload}
+                            aria-label={`Import items into ${c.name}`}
+                            onClick={() => setImportInto(c)}
+                          >
+                            Import
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={Download}
+                            aria-label={`Export ${c.name}`}
+                            disabled={!list.length}
+                            onClick={() => downloadCsv(fileNameFor(r.name, c.name), itemsToCsv(list))}
+                          >
+                            Export
+                          </Button>
                           <Button size="sm" variant="ghost" icon={Pencil} onClick={() => setCategoryForm({ category: c })}>
                             Edit
                           </Button>
@@ -307,6 +330,13 @@ export default function MenuPage() {
               items={o.items}
               item={itemForm?.item ?? null}
               categoryId={itemForm?.categoryId}
+            />
+            <MenuImport
+              open={!!importInto}
+              onOpenChange={(v) => !v && setImportInto(null)}
+              restaurant={r}
+              category={importInto}
+              items={importInto ? o.items.filter((x) => x.categoryId === importInto.id) : []}
             />
             <PromotionForm
               open={!!promoForm}

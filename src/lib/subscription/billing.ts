@@ -315,6 +315,13 @@ const CatalogSchema = z.object({
     graceDays: z.number().int().min(0).max(90),
     paymentInstructions: z.string().trim().max(1000),
     supportContact: z.string().trim().max(200),
+    desktopDownloadUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .refine((v) => !v || /^https:\/\/\S+$/i.test(v), 'The desktop download link must start with https://')
+      .optional()
+      .default(''),
   }),
 })
 

@@ -175,6 +175,9 @@ describe('owner billing page', () => {
     // Retail features only on the comparison.
     expect(screen.getAllByText('Analytics').length).toBeGreaterThan(0)
     expect(screen.queryByText('Brand & theme editor')).toBeNull()
+    // The desktop app is core: on every plan card, with where to get it.
+    expect(screen.getAllByText('Windows desktop app').length).toBe(DEFAULT_CATALOG.plans.length + 1)
+    expect(screen.getByText(/Ask the Bytewave team for the installer/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to Growth' }))
     fireEvent.change(await screen.findByLabelText('Note (optional)'), { target: { value: 'Paying Friday' } })
