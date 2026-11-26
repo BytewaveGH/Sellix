@@ -300,5 +300,12 @@ export const useEateryActions = () => {
         for (const b of bodies) out.push(await source.create(r, b))
         return out
       }, 'Couldn’t save.'),
+    // Sequential, for a menu import that changes items already there.
+    updateMany: <R extends ResourceName>(r: R, changes: { id: number; body: Partial<Omit<ResourceMap[R], 'id'>> }[]) =>
+      run(async () => {
+        const out: ResourceMap[R][] = []
+        for (const c of changes) out.push(await source.update(r, c.id, c.body))
+        return out
+      }, 'Couldn’t save changes.'),
   }
 }

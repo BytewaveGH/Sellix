@@ -959,6 +959,73 @@ The till keeps the catalogue on the PC. Instead of downloading everything each t
 
 The frontend will stop logging cashiers out when a token refresh fails *because the network is down*. Only a real 401 from the refresh endpoint will end the session. No backend change is needed, but please keep the refresh token valid for at least a few days, so a till that was offline overnight can still refresh in the morning.
 
+## 14. Platform analytics: usage and engagement per business (new)
+
+The super-admin console now has a **Usage & engagement** page (`/super-admin/analytics`) and a **Usage** tab on each business. Together they show who uses the app, how much, on which devices (desktop or web, offline or online), and who needs a follow-up call. The frontend is built. Until these endpoints exist, the console says so and works out health from `lastActivityAt` in §3's stats only. Frontend rules: `src/lib/platform/analytics.ts`. Tests: `tests/platform-analytics.test.tsx`.
+
+All counts are per tenant, in the business's local day. **Never send customer details.** Staff names are fine, because the console already lists them (§3).
+
+### 14.1 Usage events from the app (new, tenant token + `X-Tenant-Domain`)
+
+`POST /activity/events`. The app sends batches of up to 200, every 2 minutes and when the tab is hidden. While offline it keeps them on the device (up to 500) and sends them later.
+
+```
+{ "device": { "id": "till-7d3f9a2c", "kind": "desktop", "appVersion": "0.1.0" },
+  "events": [ { "at": "2026-11-26T09:14:03.000Z", "type": "view",   "area": "stores.pos", "online": true },
+              { "at": "2026-11-26T09:15:00.000Z", "type": "active", "area": "stores.pos", "online": false } ] }
+```
+
+- The user is the one on the token. `device.id` is the same id the till already sends as `X-Device-Id` on `/sync/*` (§13). `kind` is `desktop` (the Windows app) or `web`. `appVersion` is only set on desktop.
+- `type`: `view` means a screen was opened. `active` means one minute in which someone tapped or typed. The app sends at most one `active` per minute.
+- `area` is the screen, e.g. `stores.pos`, `eatery.menu`, `real-estate.payments`. It's a free string of up to 64 characters.
+- Answer `204` (or `200`). On `400`, `413` or `422` the app drops that batch. On `404`, `405` or `501` the app pauses sending for 6 hours, so it's safe to ship the frontend first.
+- A simple append-only table is enough: `(tenantId, userId, deviceId, kind, appVersion, at, type, area, online)`. Keep 13 months.
+
+### 14.2 Every business at once (`X-Platform-Key`)
+
+`GET /platform/analytics?days=7|30|90` → `{ data: PlatformUsage }`
+
+```
+PlatformUsage { from, to, days, updatedAt, tenants: TenantUsageSummary[] }   // one row per tenant, include tenants with no activity
+
+TenantUsageSummary {
+  tenantId,
+  revenue, sales,          // completed sales / eatery orders / rent payments / tickets in the period (cedis, count); refunds and cancelled out
+  activeDays,              // days with at least one sale, sign-in or "active" event
+  activeStaff, staffCount, // accounts (owner included) who signed in, sold or were active · all non-suspended accounts
+  signIns,                 // successful logins (and token refreshes that start a new day)
+  activeMinutes,           // count of "active" events
+  lastActivityAt,          // latest sale, sign-in or event; null if none ever
+  devices, desktopDevices, // distinct device ids seen in the period · of them kind = desktop
+  offlineSales,            // sales/orders whose soldAt is earlier than syncedAt by 5+ minutes (§13)
+  stuckDevices,            // devices last seen with pending > 0 whose last successful sync is 2+ days old (see 14.3)
+  previous: { revenue, sales, activeDays }   // the same figures for the period just before, same length
+}
+```
+
+### 14.3 One business in detail (`X-Platform-Key`)
+
+`GET /platform/tenants/:id/activity?days=7|30|90` → `{ data: TenantActivity }` (404 for an unknown tenant)
+
+```
+TenantActivity {
+  tenantId, from, to, updatedAt,
+  summary: TenantUsageSummary,
+  daily:   [ { date: "2026-11-25", revenue, sales, signIns, activeStaff, activeMinutes, offlineSales } ],   // days with nothing can be left out
+  staff:   [ { id, name, role, lastSeenAt, signIns, sales, revenue, activeMinutes } ],                   // every account, even with zeros
+  devices: [ { id, kind, appVersion, lastSeenAt, lastSyncAt, pending } ],
+  areas:   [ { area, views, activeMinutes, lastUsedAt } ],
+  records: { "Products": 240, "Customers": 31 }   // what they've set up, per module: products, menu items, properties/units, attractions…
+}
+```
+
+- `devices[].pending` is the number of sales or changes the device still holds. Take it from the till's `X-Pending-Count` header if you add one, or leave it at 0 and work out `stuckDevices` from the gap between `lastSeenAt` and the last `/sync/*` success. `lastSyncAt` is the device's last successful `/sync/sales` or `/eatery/sync/orders` call.
+- `records` labels are shown as given, so use plain words.
+
+### 14.4 Performance
+
+These are read by one operator, a few times a day. A nightly or hourly roll-up table per `(tenantId, date)` is fine, with `updatedAt` saying when it was counted. Live queries are fine too while the platform is small.
+
 ## Priority
 
 1. Tenant CRUD + owner-account creation (§1) — unblocks the whole "register a new business" flow for real, replaces the local JSON-file placeholder entirely.
@@ -972,7 +1039,8 @@ The frontend will stop logging cashiers out when a token refresh fails *because 
 9. Store module (§11) — §11.1 store settings first, so every till shares the receipt and payment setup. Then the list filters (§11.2).
 10. Real-estate public website (§12) — §12.2 and §12.3 make the shared link work for everyone, not just on the owner's device. Photos need §12.2's image upload.
 11. Offline selling (§13) — §13.1 first: a `clientId` on sales makes retries safe, which helps even on today's flaky connections. Then batch sync (§13.2) and "changes since" downloads (§13.3).
-12. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
-13. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
+12. Platform analytics (§14) — §14.1 (usage events) first so data starts piling up, then §14.2 for the Usage & engagement page and §14.3 for a business's Usage tab. Also add `desktopDownloadUrl` (an optional https string) to the billing catalog `settings` (§8), so owners see where to download the Windows app.
+13. ~~Camera product recognition (§5)~~ — ✅ done; open points resolved, one pending backend change (SKU 409).
+14. ~~Attractions/tickets/bookings/leaderboard (§4)~~ — ✅ done, confirmed live and matching the frontend's contract exactly (2026-08-29).
 
 Happy to hop on a call to go through response shapes/edge cases once you've had a look.

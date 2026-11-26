@@ -69,6 +69,12 @@ export function clientTenantSlug(): string | null {
   return validSlug(document.querySelector(`meta[name="${DESKTOP_BUSINESS_META}"]`)?.getAttribute('content'))
 }
 
+// In the browser: is this page running inside the Windows desktop app?
+export function isDesktopApp(): boolean {
+  if (typeof document === 'undefined') return false
+  return !!document.querySelector(`meta[name="${DESKTOP_BUSINESS_META}"]`)
+}
+
 export function slugify(input: string): string {
   return input
     .trim()

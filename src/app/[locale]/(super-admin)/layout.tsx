@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { useParams, usePathname } from 'next/navigation'
-import { Layers, LayoutDashboard, LogOut, Menu, Plus, Search, Store, Wallet } from 'lucide-react'
+import { Activity, Layers, LayoutDashboard, LogOut, Menu, Plus, Search, Store, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import ToastTemplate from '@/components/templates/toast'
@@ -34,6 +34,7 @@ const Sidebar = ({ base, onNavigate, onRegister }: { base: string; onNavigate?: 
   const nav: { label: string; href: string; icon: typeof Store; active?: boolean; count?: number; alert?: number }[] = [
     { label: 'Overview', href: base, icon: LayoutDashboard, active: pathname === base },
     { label: 'Apps', href: `${base}/apps`, icon: Store, active: pathname?.startsWith(`${base}/apps`), count: tenants.length },
+    { label: 'Analytics', href: `${base}/analytics`, icon: Activity, active: pathname?.startsWith(`${base}/analytics`) },
     { label: 'Billing', href: `${base}/billing`, icon: Wallet, active: pathname?.startsWith(`${base}/billing`), alert: billingAlerts },
     { label: 'Plans', href: `${base}/plans`, icon: Layers, active: pathname?.startsWith(`${base}/plans`) },
   ]

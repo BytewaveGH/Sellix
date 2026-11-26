@@ -31,6 +31,7 @@ import { AppAvatar, CopyButton, StatusPill, VerticalBadge, fullDate, timeAgo } f
 import { ConfirmDeleteApp } from '../../_components/confirm-delete'
 import { EditAppDrawer } from '../../_components/app-forms'
 import { SubscriptionPanel } from '../../_components/subscription-panel'
+import { TenantUsage } from '../../_components/tenant-usage'
 
 const cedis = (n: number) => `₵${new Intl.NumberFormat('en-GH', { maximumFractionDigits: 0 }).format(n)}`
 
@@ -61,7 +62,7 @@ export default function AppDetailPage() {
   // ?tab=billing (links from the billing dashboard).
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    if (t === 'staff' || t === 'billing') setTab(t)
+    if (t === 'staff' || t === 'billing' || t === 'usage') setTab(t)
   }, [])
 
   const staff = useMemo(() => {
@@ -183,6 +184,9 @@ export default function AppDetailPage() {
                 {staffCounts.all}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="usage" className="rounded-lg data-[state=active]:shadow-sm">
+            Usage
           </TabsTrigger>
           <TabsTrigger value="billing" className="rounded-lg data-[state=active]:shadow-sm">
             Billing
@@ -349,6 +353,10 @@ export default function AppDetailPage() {
               ))}
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="usage" className="mt-4">
+          <TenantUsage tenant={tenant} lastActivityAt={stats.data?.lastActivityAt} />
         </TabsContent>
 
         <TabsContent value="billing" className="mt-4">

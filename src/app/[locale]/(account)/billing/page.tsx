@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils'
 import { Button, Card, EmptyState, ErrorNote, PageHeader, Ring, SectionTitle, Skeleton } from '@/components/kit/ui'
 import { Drawer, Field, Segmented, Textarea } from '@/components/kit/form'
 import { cedis, cycleLabel, monthlyEquivalent, priceFor, staffLimit, yearlySavings } from '@/lib/subscription/access'
-import { featuresFor } from '@/lib/subscription/features'
+import { CORE_FEATURES, featuresFor } from '@/lib/subscription/features'
+import { DesktopAppCard } from '@/components/billing/desktop-app'
 import { useBilling, useBillingRequest } from '@/lib/subscription/client'
 import type { BillingCycle, Plan } from '@/lib/subscription/types'
 import { verticalMeta } from '@/lib/verticals'
@@ -261,6 +262,11 @@ export default function BillingPage() {
                     <Check className="h-4 w-4 text-emerald-600 flex-shrink-0" /> Everything in the core{' '}
                     {verticalMeta(appType).short.toLowerCase()} app
                   </li>
+                  {CORE_FEATURES.map((f) => (
+                    <li key={f.key} className="flex items-center gap-2 text-stone-700">
+                      <Check className="h-4 w-4 text-emerald-600 flex-shrink-0" /> {f.label}
+                    </li>
+                  ))}
                   {moduleFeatures.map((f) => {
                     const on = p.features.includes(f.key)
                     return (
@@ -342,6 +348,8 @@ export default function BillingPage() {
           <p className="text-xs text-stone-500 mt-3">Once your payment is confirmed, it appears here and your plan renews automatically.</p>
         </Card>
       </div>
+
+      <DesktopAppCard url={catalog.settings.desktopDownloadUrl} support={catalog.settings.supportContact} className="mt-4" />
 
       <Drawer
         open={!!asking}

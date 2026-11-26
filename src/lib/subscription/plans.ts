@@ -75,5 +75,6 @@ export const DEFAULT_CATALOG: Catalog = {
     graceDays: 7,
     paymentInstructions: 'Pay by MoMo or bank transfer and use your business address (subdomain) as the reference.',
     supportContact: '',
+    desktopDownloadUrl: '',
   },
 }

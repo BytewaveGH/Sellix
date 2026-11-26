@@ -12,6 +12,7 @@ import { canUseFeature } from '@/lib/subscription/access'
 import { featureForPath } from '@/lib/subscription/features'
 import { useBilling } from '@/lib/subscription/client'
 import { SubscriptionGate } from '@/components/billing/gate'
+import { ActivityTracker } from '@/components/activity/activity-tracker'
 
 const ILayout = ({ children }: { children: React.ReactNode }) => {
   const { data: session, status } = useSession()
@@ -47,6 +48,7 @@ const ILayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <main className="w-full">
+      <ActivityTracker />
       <nav className="w-full sticky left-0 top-0 z-10 bg-white">
         <TopNav />
       </nav>

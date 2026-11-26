@@ -56,7 +56,16 @@ for (const key of Object.keys(desktopEnv)) {
   }
 }
 
-const env = { ...process.env, ...desktopEnv, ...BLANKED, BUILD_TARGET: 'desktop', NEXT_TELEMETRY_DISABLED: '1' }
+// The installer's version, so the console can see which tills run which build.
+const appVersion = JSON.parse(fs.readFileSync(path.join(desktopDir, 'package.json'), 'utf8')).version
+const env = {
+  ...process.env,
+  ...desktopEnv,
+  ...BLANKED,
+  BUILD_TARGET: 'desktop',
+  NEXT_PUBLIC_APP_VERSION: appVersion,
+  NEXT_TELEMETRY_DISABLED: '1',
+}
 
 // What the build will use, for the person running it.
 const webEnv = { ...parseEnv(path.join(root, '.env')), ...parseEnv(path.join(root, '.env.production')), ...parseEnv(path.join(root, '.env.local')) }

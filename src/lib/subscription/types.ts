@@ -42,6 +42,9 @@ export interface BillingSettings {
   // Shown to owners on their billing page, e.g. MoMo number and reference rules.
   paymentInstructions: string
   supportContact: string
+  // Where owners download the Windows desktop app (a core feature on every
+  // plan). Empty: the billing page says to ask support for it.
+  desktopDownloadUrl?: string
 }
 
 export interface Catalog {

@@ -1,8 +1,9 @@
 import { Providers } from '@/components/generals/providers'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
 import { headers } from 'next/headers'
 import { DESKTOP_BUSINESS_META, desktopBusiness, hostTenantSlug } from '@/lib/tenant'
+import { THEME_COLOR, businessName } from './manifest'
 import './globals.css'
 // import { Providers } from '@/components/providers'
 
@@ -23,9 +24,20 @@ export async function generateMetadata(): Promise<Metadata> {
     title: slug ?? 'sellix',
     description:
       'Sellix — multi-tenant point-of-sale and business management platform, powering retail, eatery, and amusement park operations from one dashboard.',
+    // Installed on a phone or tablet (manifest.ts): full screen, named after the business.
+    appleWebApp: { capable: true, title: slug ? businessName(slug) : 'Sellix', statusBarStyle: 'default' },
+    formatDetection: { telephone: false },
     // Desktop app only: tells the browser side which business this till is set up for.
     ...(desktop ? { other: { [DESKTOP_BUSINESS_META]: desktop } } : {}),
   }
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // No viewport-fit=cover: iOS keeps pages clear of the notch and home bar,
+  // so fixed bottom bars (the POS cart) stay tappable when installed.
+  themeColor: THEME_COLOR,
 }
 
 export default function RootLayout({

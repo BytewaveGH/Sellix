@@ -77,11 +77,11 @@ export const useBrandFavicon = (brand: Brand | undefined) => {
 
   useEffect(() => {
     if (!href) return
-    // Point every icon link at the brand icon; put the platform's back afterwards.
-    // iOS home-screen icons can't be SVG, so the initials icon leaves that one alone.
+    // Point every tab icon at the brand icon; put the platform's back afterwards.
+    // The home-screen icon (apple-touch-icon) is the installable app's, set
+    // full size by usePublicApp.
     const type = href.startsWith('data:image/svg') ? 'image/svg+xml' : 'image/png'
-    const selector = type === 'image/png' ? 'link[rel~="icon"], link[rel="apple-touch-icon"]' : 'link[rel~="icon"]'
-    const links = Array.from(document.querySelectorAll<HTMLLinkElement>(selector))
+    const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'))
     const saved = links.map((l) => [l, l.getAttribute('href'), l.getAttribute('type'), l.getAttribute('sizes')] as const)
     for (const l of links) {
       l.href = href

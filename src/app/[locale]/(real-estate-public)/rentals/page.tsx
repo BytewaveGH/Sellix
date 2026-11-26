@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { usePublicApp } from '@/components/install/use-public-app'
 import { ArrowRight, Building2, MapPin, Search, SearchX, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { apiErrorMessage } from '@/lib/api-error'
@@ -67,6 +68,7 @@ const Chips = <T extends string>({
 export default function SellixHomes() {
   const params = useParams()
   const locale = (params?.locale as string) || 'en'
+  usePublicApp({ path: `/${locale}/rentals`, name: 'Sellix Homes', bg: '#0865AC', fg: '#FFFFFF' })
   const { data, isLoading, error, refetch, isFetching } = useRentalsDirectory()
 
   const [query, setQuery] = useState('')
