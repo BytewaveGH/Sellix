@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 import { platformFetch, requireSuperAdminSession } from '@/lib/platform-api'
 
 export const PERIODS = [7, 30, 90] as const
-export const periodOf = (v: string | null) => (PERIODS as readonly number[]).includes(Number(v)) ? Number(v) : 30
+export const periodOf = (v: string | null) => ((PERIODS as readonly number[]).includes(Number(v)) ? Number(v) : 30)
 
 export async function proxyAnalytics(path: string) {
   if (!(await requireSuperAdminSession())) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })

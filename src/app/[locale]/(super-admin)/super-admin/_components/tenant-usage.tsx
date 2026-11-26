@@ -9,15 +9,7 @@ import { Activity, Clock, Info, Laptop, MonitorDown, Receipt, TrendingUp, Users,
 import { cn } from '@/lib/utils'
 import { BarChart, Card, EmptyState, ErrorNote, LoadingGrid, SectionTitle, StatCard } from '@/components/kit/ui'
 import { Segmented } from '@/components/kit/form'
-import {
-  areaLabel,
-  deviceStatus,
-  engagement,
-  fillDays,
-  latestVersion,
-  weekdayProfile,
-  type DailyUsage,
-} from '@/lib/platform/analytics'
+import { areaLabel, deviceStatus, engagement, fillDays, latestVersion, weekdayProfile, type DailyUsage } from '@/lib/platform/analytics'
 import { useTenantActivity } from '../_logics/analytics'
 import type { TenantRecord } from '../_logics/types'
 import { fullDate, timeAgo } from './bits'
@@ -209,7 +201,9 @@ export const TenantUsage = ({ tenant, lastActivityAt }: { tenant: TenantRecord; 
                       <td className="py-2.5 pr-4 text-right tabular-nums">{p.sales.toLocaleString()}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums">{cedis(p.revenue)}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums">{hours(p.activeMinutes)}</td>
-                      <td className="py-2.5 pr-5 text-xs text-stone-500 whitespace-nowrap">{p.lastSeenAt ? timeAgo(p.lastSeenAt) : 'Not in this period'}</td>
+                      <td className="py-2.5 pr-5 text-xs text-stone-500 whitespace-nowrap">
+                        {p.lastSeenAt ? timeAgo(p.lastSeenAt) : 'Not in this period'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

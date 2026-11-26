@@ -143,7 +143,11 @@ export const cachedRead = async (scope: string, req: RequestLike): Promise<Cache
 // Rewrite every cached answer in the scope that `fn` changes.
 // `match` picks the answers by key first, so only those are read from disk
 // (the kept product catalogue alone can be megabytes).
-const patchReads = async (scope: string, fn: (key: string, body: unknown) => unknown | undefined, match: (key: string) => boolean = () => true) => {
+const patchReads = async (
+  scope: string,
+  fn: (key: string, body: unknown) => unknown | undefined,
+  match: (key: string) => boolean = () => true
+) => {
   const store = offlineStore()
   const prefix = readPrefix(scope)
   for (const k of await store.keys(prefix)) {
@@ -159,19 +163,23 @@ const patchReads = async (scope: string, fn: (key: string, body: unknown) => unk
 // Show a change in the cached answers it affects.
 const showInReads = async (scope: string, req: RequestLike, change: Change, collection: string) => {
   const one = change.kind === 'create' ? null : `${collection}/${change.id}`
-  await patchReads(scope, (key, body) => {
-    if (listsCollection(key, collection)) {
-      const rows = listIn(body)
-      return rows ? withList(body, applyToList(rows, change)) : undefined
-    }
-    if (one && change.kind === 'update' && key === one) {
-      const row = rowIn(body)
-      if (!row) return undefined
-      const merged = { ...row, ...change.patch, id: row.id }
-      return body && typeof body === 'object' && 'data' in (body as object) ? { ...(body as object), data: merged } : merged
-    }
-    return undefined
-  }, (key) => listsCollection(key, collection) || key === one)
+  await patchReads(
+    scope,
+    (key, body) => {
+      if (listsCollection(key, collection)) {
+        const rows = listIn(body)
+        return rows ? withList(body, applyToList(rows, change)) : undefined
+      }
+      if (one && change.kind === 'update' && key === one) {
+        const row = rowIn(body)
+        if (!row) return undefined
+        const merged = { ...row, ...change.patch, id: row.id }
+        return body && typeof body === 'object' && 'data' in (body as object) ? { ...(body as object), data: merged } : merged
+      }
+      return undefined
+    },
+    (key) => listsCollection(key, collection) || key === one
+  )
 }
 
 // A write the server accepted (online): lay its answer into the kept lists
@@ -181,7 +189,8 @@ export const showWritten = async (scope: string, req: RequestLike, answer: unkno
     const shape = writeShape(req)
     const row = rowIn(parsed(answer))
     if (shape.kind === 'create') {
-      if (row && row.id !== undefined && row.id !== null) await showInReads(scope, req, { kind: 'create', row }, appendTo ?? shape.collection)
+      if (row && row.id !== undefined && row.id !== null)
+        await showInReads(scope, req, { kind: 'create', row }, appendTo ?? shape.collection)
     } else if (shape.kind === 'update') {
       const sent = (parsed(req.data) ?? {}) as Record<string, unknown>
       const patch = row && Number(row.id) === shape.id ? row : sent
@@ -310,7 +319,13 @@ export type Send = (req: SendRequest) => Promise<{ data: unknown }>
 // `paths`: the lists the sent changes belong to, so only those are reloaded.
 // `made`: rows that were shown from the outbox, now with the server's id, so a
 // screen can keep showing them while its list reloads.
-export type SyncResult = { sent: number; failed: number; stopped: boolean; paths: string[]; made: { path: string; row: Record<string, unknown> }[] }
+export type SyncResult = {
+  sent: number
+  failed: number
+  stopped: boolean
+  paths: string[]
+  made: { path: string; row: Record<string, unknown> }[]
+}
 
 const syncing = new Map<string, Promise<SyncResult>>()
 // Every finished sync, wherever it was started (a charge, a timer, reconnecting).
@@ -423,7 +438,12 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
           if (!r) continue // not answered for: stays waiting for next time
           if (r.status === 'rejected') {
             failed++
-            await saveOp({ ...o, status: 'failed', code: r.code, error: refusalMessage(r.code, r.message ?? 'Refused by the server', o.names) })
+            await saveOp({
+              ...o,
+              status: 'failed',
+              code: r.code,
+              error: refusalMessage(r.code, r.message ?? 'Refused by the server', o.names),
+            })
             continue
           }
           await dropOp(o)
@@ -462,7 +482,8 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
             await saveOp({
               ...op,
               status: 'check',
-              error: 'The connection dropped while this was being sent, so it may already be recorded. Check, then send it again or discard it.',
+              error:
+                'The connection dropped while this was being sent, so it may already be recorded. Check, then send it again or discard it.',
             })
           }
           emit()
@@ -489,7 +510,10 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
   })()
   syncing.set(scope, run)
   emit()
-  void run.then((r) => syncedListeners.forEach((l) => l(scope, r)), () => undefined)
+  void run.then(
+    (r) => syncedListeners.forEach((l) => l(scope, r)),
+    () => undefined
+  )
   return run.finally(() => {
     syncing.delete(scope)
     emit()
@@ -500,12 +524,21 @@ export const syncOutbox = (scope: string, send: Send): Promise<SyncResult> => {
 // ── Server changes (§13.3) ───────────────────────────────────────────────────
 
 // Fold rows the server changed into every kept list of `collection`.
-export const mergeIntoReads = (scope: string, collection: string, changed: Record<string, unknown>[], deleted: (row: Record<string, unknown>) => boolean) =>
-  patchReads(scope, (key, body) => {
-    if (!listsCollection(key, collection)) return undefined
-    const rows = listIn(body)
-    return rows ? withList(body, mergeRows(key, rows, changed, deleted)) : undefined
-  }, (key) => listsCollection(key, collection))
+export const mergeIntoReads = (
+  scope: string,
+  collection: string,
+  changed: Record<string, unknown>[],
+  deleted: (row: Record<string, unknown>) => boolean
+) =>
+  patchReads(
+    scope,
+    (key, body) => {
+      if (!listsCollection(key, collection)) return undefined
+      const rows = listIn(body)
+      return rows ? withList(body, mergeRows(key, rows, changed, deleted)) : undefined
+    },
+    (key) => listsCollection(key, collection)
+  )
 
 // Any other change to the kept answers (e.g. stock levels inside products).
 export const patchKeptReads = (scope: string, fn: (key: string, body: unknown) => unknown | undefined, match?: (key: string) => boolean) =>
@@ -522,7 +555,10 @@ export const settleKept = async (scope: string, id: string) => {
 }
 
 // Small values kept per scope (e.g. a sync cursor).
-export const getKept = <T>(scope: string, name: string) => offlineStore().get<T>(`k:${scope}|${name}`).catch(() => undefined)
+export const getKept = <T>(scope: string, name: string) =>
+  offlineStore()
+    .get<T>(`k:${scope}|${name}`)
+    .catch(() => undefined)
 export const setKept = (scope: string, name: string, value: unknown) =>
   value === undefined ? offlineStore().delete(`k:${scope}|${name}`) : offlineStore().set(`k:${scope}|${name}`, value)
 

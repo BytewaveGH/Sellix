@@ -242,7 +242,9 @@ export default function BillingPage() {
                 ) : (
                   <>
                     <p className="mt-3">
-                      <span className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">{cedis(priceFor(p, cycle))}</span>
+                      <span className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">
+                        {cedis(priceFor(p, cycle))}
+                      </span>
                       <span className="text-sm text-stone-500"> /{cycleLabel(cycle)}</span>
                     </p>
                     <p className="text-[11px] text-stone-400 h-4">

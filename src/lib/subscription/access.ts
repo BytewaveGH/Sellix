@@ -56,8 +56,7 @@ export const canUseFeature = (access: Pick<Access, 'plan'>, feature: FeatureKey)
   !access.plan || !!access.plan.usage || access.plan.features.includes(feature)
 
 // Pay as you sell has no staff limit.
-export const staffLimit = (access: Pick<Access, 'plan'>): number | null =>
-  access.plan?.usage ? null : (access.plan?.limits.staff ?? null)
+export const staffLimit = (access: Pick<Access, 'plan'>): number | null => (access.plan?.usage ? null : (access.plan?.limits.staff ?? null))
 
 export const canAddStaff = (access: Pick<Access, 'plan'>, used: number) => {
   const limit = staffLimit(access)

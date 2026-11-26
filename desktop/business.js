@@ -82,7 +82,10 @@ async function lookUp(serverDir, input) {
     }
     return { ok: true, slug, appType: body.data.appType ?? null, name: displayName(slug) }
   } catch {
-    return { ok: false, message: "Couldn't reach Sellix to check the code. Setting up a till needs internet once. Check the connection and try again." }
+    return {
+      ok: false,
+      message: "Couldn't reach Sellix to check the code. Setting up a till needs internet once. Check the connection and try again.",
+    }
   } finally {
     t.done()
   }

@@ -21,7 +21,13 @@ import { DESKTOP_BUSINESS_META } from '@/lib/tenant'
 describe('manifest', () => {
   it('is named after the business on its subdomain, with installable icons', () => {
     const m = manifest()
-    expect(m).toMatchObject({ name: 'Belkis Hub · Sellix', short_name: 'Belkis Hub', display: 'standalone', start_url: '/', theme_color: '#0865AC' })
+    expect(m).toMatchObject({
+      name: 'Belkis Hub · Sellix',
+      short_name: 'Belkis Hub',
+      display: 'standalone',
+      start_url: '/',
+      theme_color: '#0865AC',
+    })
     const sizes = (m.icons ?? []).map((i) => `${i.sizes} ${i.purpose}`)
     expect(sizes).toEqual(expect.arrayContaining(['192x192 any', '512x512 any', '192x192 maskable', '512x512 maskable']))
   })
@@ -74,7 +80,12 @@ describe('Install app button', () => {
     meta.content = 'belkis'
     document.head.appendChild(meta)
     render(<InstallApp />)
-    act(() => void window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt: vi.fn(), userChoice: Promise.resolve({ outcome: 'dismissed' }) })))
+    act(
+      () =>
+        void window.dispatchEvent(
+          Object.assign(new Event('beforeinstallprompt'), { prompt: vi.fn(), userChoice: Promise.resolve({ outcome: 'dismissed' }) })
+        )
+    )
     expect(screen.queryByRole('button', { name: 'Install app' })).toBeNull()
   })
 })
@@ -83,7 +94,9 @@ describe('first-visit install card (phones and tablets)', () => {
   const ua = navigator.userAgent
   const setUa = (v: string) => Object.defineProperty(navigator, 'userAgent', { value: v, configurable: true })
   const offer = (prompt = vi.fn(async () => {}), outcome: 'accepted' | 'dismissed' = 'accepted') =>
-    act(() => void window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome }) })))
+    act(
+      () => void window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome }) }))
+    )
   beforeEach(() => {
     localStorage.clear()
     resetInstallState()
@@ -133,8 +146,12 @@ describe('first-visit install card (phones and tablets)', () => {
     expect(await screen.findByText('Add Kofi And Crumb to your home screen')).toBeTruthy()
     expect(screen.getByText(/Order again in one tap/)).toBeTruthy()
     // Its own manifest and home-screen icon.
-    expect(document.head.querySelector('link[rel="manifest"]')?.getAttribute('href')).toMatch(/^\/api\/app-manifest\?path=%2Fen%2Feat%2Fkofi-and-crumb&name=Kofi\+And\+Crumb/)
-    expect(document.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href')).toMatch(/^\/api\/app-icon\?text=KA&bg=%23D4572A/)
+    expect(document.head.querySelector('link[rel="manifest"]')?.getAttribute('href')).toMatch(
+      /^\/api\/app-manifest\?path=%2Fen%2Feat%2Fkofi-and-crumb&name=Kofi\+And\+Crumb/
+    )
+    expect(document.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href')).toMatch(
+      /^\/api\/app-icon\?text=KA&bg=%23D4572A/
+    )
     // "Not now" there doesn't hide the dashboard's own card.
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
     expect(Object.keys(localStorage).some((k) => k.endsWith(':/en/eat/kofi-and-crumb'))).toBe(true)
@@ -206,7 +223,6 @@ describe('public site manifest in the page', () => {
   })
 })
 
-
 describe('Get the app button on a public site', () => {
   const ua = navigator.userAgent
   const setUa = (v: string) => Object.defineProperty(navigator, 'userAgent', { value: v, configurable: true })
@@ -227,7 +243,12 @@ describe('Get the app button on a public site', () => {
     setUa('Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile')
     render(<Storefront />)
     const prompt = vi.fn(async () => {})
-    act(() => void window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome: 'accepted' }) })))
+    act(
+      () =>
+        void window.dispatchEvent(
+          Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome: 'accepted' }) })
+        )
+    )
     fireEvent.click(await screen.findByRole('button', { name: 'Get the Kofi And Crumb app' }))
     await act(async () => {})
     expect(prompt).toHaveBeenCalled()
@@ -251,7 +272,12 @@ describe('Get the app button on a public site', () => {
     const a = render(<GetAppButton />)
     expect(screen.queryByRole('button', { name: /Get the/ })).toBeNull()
     a.unmount()
-    window.matchMedia = ((q: string) => ({ matches: q.includes('standalone'), media: q, addEventListener() {}, removeEventListener() {} })) as any
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes('standalone'),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as any
     render(<Storefront />)
     expect(screen.queryByRole('button', { name: /Get the/ })).toBeNull()
     window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as any

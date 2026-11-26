@@ -18,7 +18,19 @@ const BLANK: Plan = { id: '', name: '', tagline: '', monthlyPrice: 0, yearlyPric
 
 // ── Pay as you sell rates ────────────────────────────────────────────────────
 
-const RateInput = ({ id, label, hint, value, onChange }: { id: string; label: string; hint?: string; value: number; onChange: (n: number) => void }) => (
+const RateInput = ({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  id: string
+  label: string
+  hint?: string
+  value: number
+  onChange: (n: number) => void
+}) => (
   <Field label={label} hint={hint} htmlFor={id}>
     <Input
       id={id}
@@ -39,8 +51,8 @@ const UsageEditor = ({ value, onChange }: { value: UsagePricing; onChange: (u: U
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 p-4">
       <p className="text-xs text-stone-500">
-        No monthly price: every feature and unlimited staff, with a fee on each month’s sales, billed after the month. Rates are a
-        percent of completed sales after discounts.
+        No monthly price: every feature and unlimited staff, with a fee on each month’s sales, billed after the month. Rates are a percent
+        of completed sales after discounts.
       </p>
       <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Store POS, by the product’s fee type</p>
       <FormGrid>
@@ -58,7 +70,12 @@ const UsageEditor = ({ value, onChange }: { value: UsagePricing; onChange: (u: U
       <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Other modules</p>
       <FormGrid>
         <RateInput id="rate-eatery" label="Eatery orders" value={rates.eatery} onChange={(n) => setRate('eatery', n)} />
-        <RateInput id="rate-amusement" label="Amusement tickets & counter" value={rates.amusement} onChange={(n) => setRate('amusement', n)} />
+        <RateInput
+          id="rate-amusement"
+          label="Amusement tickets & counter"
+          value={rates.amusement}
+          onChange={(n) => setRate('amusement', n)}
+        />
         <RateInput id="rate-rent" label="Rent collected" value={rates.rent} onChange={(n) => setRate('rent', n)} />
         <RateInput id="rate-stays" label="Short-stay bookings" value={rates.shortStays} onChange={(n) => setRate('shortStays', n)} />
       </FormGrid>
@@ -219,59 +236,59 @@ const PlanDrawer = ({
           <UsageEditor value={p.usage} onChange={(u) => set('usage', u)} />
         ) : (
           <>
-        <FormGrid>
-          <Field label="Monthly price" htmlFor="plan-monthly">
-            <Input
-              id="plan-monthly"
-              type="number"
-              min={0}
-              prefix="₵"
-              value={p.monthlyPrice}
-              onChange={(e) => set('monthlyPrice', Math.max(0, toNum(e.target.value)))}
-            />
-          </Field>
-          <Field
-            label="Yearly price"
-            hint={
-              saving > 0
-                ? `Saves ${cedis(saving)} (${Math.round((saving / Math.max(1, p.monthlyPrice * 12)) * 100)}%)`
-                : 'Same as 12 months'
-            }
-            htmlFor="plan-yearly"
-          >
-            <Input
-              id="plan-yearly"
-              type="number"
-              min={0}
-              prefix="₵"
-              value={p.yearlyPrice}
-              onChange={(e) => set('yearlyPrice', Math.max(0, toNum(e.target.value)))}
-            />
-          </Field>
-        </FormGrid>
-        <FormGrid>
-          <Field label="Staff accounts" htmlFor="plan-staff">
-            <Input
-              id="plan-staff"
-              type="number"
-              min={0}
-              disabled={unlimited}
-              value={unlimited ? '' : (p.limits.staff ?? 0)}
-              placeholder="Unlimited"
-              onChange={(e) => set('limits', { staff: Math.max(0, Math.round(toNum(e.target.value))) })}
-            />
-          </Field>
-          <Field label="Free trial (days)" hint="0 = no trial" htmlFor="plan-trial">
-            <Input
-              id="plan-trial"
-              type="number"
-              min={0}
-              max={365}
-              value={p.trialDays}
-              onChange={(e) => set('trialDays', Math.max(0, Math.round(toNum(e.target.value))))}
-            />
-          </Field>
-        </FormGrid>
+            <FormGrid>
+              <Field label="Monthly price" htmlFor="plan-monthly">
+                <Input
+                  id="plan-monthly"
+                  type="number"
+                  min={0}
+                  prefix="₵"
+                  value={p.monthlyPrice}
+                  onChange={(e) => set('monthlyPrice', Math.max(0, toNum(e.target.value)))}
+                />
+              </Field>
+              <Field
+                label="Yearly price"
+                hint={
+                  saving > 0
+                    ? `Saves ${cedis(saving)} (${Math.round((saving / Math.max(1, p.monthlyPrice * 12)) * 100)}%)`
+                    : 'Same as 12 months'
+                }
+                htmlFor="plan-yearly"
+              >
+                <Input
+                  id="plan-yearly"
+                  type="number"
+                  min={0}
+                  prefix="₵"
+                  value={p.yearlyPrice}
+                  onChange={(e) => set('yearlyPrice', Math.max(0, toNum(e.target.value)))}
+                />
+              </Field>
+            </FormGrid>
+            <FormGrid>
+              <Field label="Staff accounts" htmlFor="plan-staff">
+                <Input
+                  id="plan-staff"
+                  type="number"
+                  min={0}
+                  disabled={unlimited}
+                  value={unlimited ? '' : (p.limits.staff ?? 0)}
+                  placeholder="Unlimited"
+                  onChange={(e) => set('limits', { staff: Math.max(0, Math.round(toNum(e.target.value))) })}
+                />
+              </Field>
+              <Field label="Free trial (days)" hint="0 = no trial" htmlFor="plan-trial">
+                <Input
+                  id="plan-trial"
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={p.trialDays}
+                  onChange={(e) => set('trialDays', Math.max(0, Math.round(toNum(e.target.value))))}
+                />
+              </Field>
+            </FormGrid>
           </>
         )}
         <div className="rounded-2xl border border-stone-200 p-4 flex flex-col gap-4">

@@ -7,7 +7,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_EATERY_DATA_SOURCE = 'local'
 })
-vi.mock('next/navigation', () => ({ useParams: () => ({ locale: 'en' }), useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({
+  useParams: () => ({ locale: 'en' }),
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn() }),
+}))
 vi.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: { tenant: 'acme' } } }) }))
 vi.mock('@/hooks/use-axios', () => ({ useAxios: () => vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
@@ -69,7 +73,14 @@ describe('reading a menu', () => {
       ['skip', 'Banku', 'No price'],
     ])
     const first = rows[0]
-    expect(first.action === 'create' && first.body).toMatchObject({ restaurantId: 1, categoryId: 2, status: 'available', tags: [], optionGroups: [], position: 0 })
+    expect(first.action === 'create' && first.body).toMatchObject({
+      restaurantId: 1,
+      categoryId: 2,
+      status: 'available',
+      tags: [],
+      optionGroups: [],
+      position: 0,
+    })
   })
 
   it('rows copied from a spreadsheet (tabs), without a header', () => {
@@ -82,7 +93,10 @@ describe('reading a menu', () => {
   it('a spreadsheet with a header in any wording', () => {
     const csv = 'Dish,Price (₵),Details,Tags\r\nRed red,30,"Beans, plantain",Vegetarian; spicy\r\nTea,abc,,'
     const { rows } = planMenuImport(csv, ctx())
-    expect(rows[0]).toMatchObject({ action: 'create', body: { name: 'Red red', price: 30, description: 'Beans, plantain', tags: ['vegetarian', 'spicy'] } })
+    expect(rows[0]).toMatchObject({
+      action: 'create',
+      body: { name: 'Red red', price: 30, description: 'Beans, plantain', tags: ['vegetarian', 'spicy'] },
+    })
     expect(rows[1]).toMatchObject({ action: 'skip', reason: 'Price “abc” isn’t a number' })
   })
 
@@ -94,7 +108,11 @@ describe('reading a menu', () => {
   })
 
   it('options: pick-one groups and extras with their settings', () => {
-    const { groups } = parseOptions('Size: Regular 5, Maxi 7 | Proteins (extras, up to 10, once per line, more than one of each): Egg 3, Fish 20 (sold out)', [], newId)
+    const { groups } = parseOptions(
+      'Size: Regular 5, Maxi 7 | Proteins (extras, up to 10, once per line, more than one of each): Egg 3, Fish 20 (sold out)',
+      [],
+      newId
+    )
     expect(groups[0]).toMatchObject({ name: 'Size', kind: 'variant', min: 1, max: 1 })
     expect(groups[1]).toMatchObject({ name: 'Proteins', kind: 'addon', min: 0, max: 10, chargeOnce: true, repeat: true })
     expect(groups[1].choices[1]).toMatchObject({ name: 'Fish', priceDelta: 20, soldOut: true })

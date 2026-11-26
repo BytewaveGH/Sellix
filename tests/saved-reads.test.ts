@@ -17,7 +17,10 @@ const server = () => {
     s.calls++
     const v = s.version
     return new Promise((resolve) =>
-      setTimeout(() => resolve({ data: JSON.stringify({ data: [{ id: 1, v }] }), status: 200, statusText: 'OK', headers: {}, config, request: {} }), s.delay)
+      setTimeout(
+        () => resolve({ data: JSON.stringify({ data: [{ id: 1, v }] }), status: 200, statusText: 'OK', headers: {}, config, request: {} }),
+        s.delay
+      )
     )
   }
   return { s, adapter: withOffline(base, async () => ({ data: {} }), GRACE) }

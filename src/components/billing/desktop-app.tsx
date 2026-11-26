@@ -20,7 +20,8 @@ export const DesktopAppCard = ({ url, support, className }: { url?: string; supp
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-bold text-stone-900">
-          Windows desktop app <span className="ml-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">Included in every plan</span>
+          Windows desktop app{' '}
+          <span className="ml-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">Included in every plan</span>
         </p>
         <p className="text-sm text-stone-500 mt-0.5 inline-flex items-start gap-1.5">
           <WifiOff className="h-4 w-4 mt-0.5 flex-shrink-0 text-stone-400" />

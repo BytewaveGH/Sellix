@@ -16,7 +16,11 @@ export const SyncPill = ({ order }: { order: Pick<Order, 'syncState'> }) =>
         'ml-1.5 inline-flex rounded-full px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide',
         order.syncState === 'syncing' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-800'
       )}
-      title={order.syncState === 'syncing' ? 'Saved on this till, on its way to the server' : 'The server refused it — see the sync list at the top'}
+      title={
+        order.syncState === 'syncing'
+          ? 'Saved on this till, on its way to the server'
+          : 'The server refused it — see the sync list at the top'
+      }
     >
       {order.syncState === 'syncing' ? 'Syncing' : 'Needs attention'}
     </span>

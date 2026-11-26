@@ -5,20 +5,44 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'" />
     <title>Sellix POS</title>
     <style>
-      html, body { height: 100%; margin: 0; }
+      html,
       body {
-        display: grid; place-items: center;
-        font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
-        color: #1f2937; background: #ffffff;
+        height: 100%;
+        margin: 0;
       }
-      .box { display: grid; justify-items: center; gap: 14px; }
+      body {
+        display: grid;
+        place-items: center;
+        font:
+          15px/1.5 'Segoe UI',
+          system-ui,
+          sans-serif;
+        color: #1f2937;
+        background: #ffffff;
+      }
+      .box {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+      }
       .spin {
-        width: 28px; height: 28px; border-radius: 50%;
-        border: 3px solid #e5e7eb; border-top-color: #111827;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 3px solid #e5e7eb;
+        border-top-color: #111827;
         animation: spin 0.9s linear infinite;
       }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .spin {
+          animation-duration: 3s;
+        }
+      }
     </style>
   </head>
   <body>

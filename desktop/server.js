@@ -72,9 +72,7 @@ async function startServer({ business }) {
     throw new Error(`The app's server is missing (${serverFile}). Run "npm run build:web" in the desktop folder.`)
   }
   if (!(await portIsFree())) {
-    throw new Error(
-      `Port ${PORT} is already in use. Sellix may already be open, or another program is using it. Close it and try again.`
-    )
+    throw new Error(`Port ${PORT} is already in use. Sellix may already be open, or another program is using it. Close it and try again.`)
   }
 
   const logDir = path.join(app.getPath('userData'), 'logs')

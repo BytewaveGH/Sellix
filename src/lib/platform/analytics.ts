@@ -97,11 +97,31 @@ export interface TenantActivity {
 export type Health = 'thriving' | 'steady' | 'at-risk' | 'dormant' | 'new'
 
 export const HEALTH: Record<Health, { label: string; hint: string; className: string; dot: string }> = {
-  thriving: { label: 'Thriving', hint: 'Used most days by the team', className: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15', dot: 'bg-emerald-500' },
+  thriving: {
+    label: 'Thriving',
+    hint: 'Used most days by the team',
+    className: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
+    dot: 'bg-emerald-500',
+  },
   steady: { label: 'Steady', hint: 'Used regularly', className: 'bg-sky-50 text-sky-700 ring-sky-600/15', dot: 'bg-sky-500' },
-  'at-risk': { label: 'At risk', hint: 'Little use, or dropping fast', className: 'bg-amber-50 text-amber-800 ring-amber-600/20', dot: 'bg-amber-500' },
-  dormant: { label: 'Dormant', hint: 'Nothing for 14 days or more', className: 'bg-rose-50 text-rose-700 ring-rose-600/15', dot: 'bg-rose-500' },
-  new: { label: 'Getting started', hint: 'Registered in the last 14 days', className: 'bg-violet-50 text-violet-700 ring-violet-600/15', dot: 'bg-violet-500' },
+  'at-risk': {
+    label: 'At risk',
+    hint: 'Little use, or dropping fast',
+    className: 'bg-amber-50 text-amber-800 ring-amber-600/20',
+    dot: 'bg-amber-500',
+  },
+  dormant: {
+    label: 'Dormant',
+    hint: 'Nothing for 14 days or more',
+    className: 'bg-rose-50 text-rose-700 ring-rose-600/15',
+    dot: 'bg-rose-500',
+  },
+  new: {
+    label: 'Getting started',
+    hint: 'Registered in the last 14 days',
+    className: 'bg-violet-50 text-violet-700 ring-violet-600/15',
+    dot: 'bg-violet-500',
+  },
 }
 
 export const HEALTH_ORDER: Health[] = ['thriving', 'steady', 'new', 'at-risk', 'dormant']
@@ -275,13 +295,29 @@ export const usageAlerts = <T extends TenantLike & { name: string }>(rows: Usage
     const h = r.engagement.health
     const paying = r.billing && (r.billing.state === 'active' || r.billing.state === 'past_due') && r.billing.monthly > 0
     if (r.usage?.stuckDevices)
-      out.push({ kind: 'unsent', row: r, message: `${r.usage.stuckDevices} device${r.usage.stuckDevices === 1 ? ' has' : 's have'} sales not sent for 2+ days` })
+      out.push({
+        kind: 'unsent',
+        row: r,
+        message: `${r.usage.stuckDevices} device${r.usage.stuckDevices === 1 ? ' has' : 's have'} sales not sent for 2+ days`,
+      })
     if (paying && (h === 'dormant' || h === 'at-risk'))
-      out.push({ kind: 'paying-idle', row: r, message: `Pays ₵${Math.round(r.billing!.monthly)}/month but is ${HEALTH[h].label.toLowerCase()}` })
+      out.push({
+        kind: 'paying-idle',
+        row: r,
+        message: `Pays ₵${Math.round(r.billing!.monthly)}/month but is ${HEALTH[h].label.toLowerCase()}`,
+      })
     else if (r.billing?.state === 'trialing' && (r.billing.trialEndsInDays ?? 99) <= 7 && r.engagement.score < 40)
-      out.push({ kind: 'trial-low', row: r, message: `Trial ends in ${Math.max(0, r.billing.trialEndsInDays ?? 0)} days, little use so far` })
+      out.push({
+        kind: 'trial-low',
+        row: r,
+        message: `Trial ends in ${Math.max(0, r.billing.trialEndsInDays ?? 0)} days, little use so far`,
+      })
     else if (r.usage && (trend(r.usage.sales, r.usage.previous.sales) ?? 0) <= -50)
-      out.push({ kind: 'dropping', row: r, message: `Sales down ${Math.abs(trend(r.usage.sales, r.usage.previous.sales)!)}% on the period before` })
+      out.push({
+        kind: 'dropping',
+        row: r,
+        message: `Sales down ${Math.abs(trend(r.usage.sales, r.usage.previous.sales)!)}% on the period before`,
+      })
     else if (r.usage && r.usage.lastActivityAt === null && r.usage.signIns === 0)
       out.push({ kind: 'never-used', row: r, message: 'Never signed in' })
   }
@@ -300,7 +336,26 @@ const csvCell = (v: unknown) => {
 
 export const usageToCsv = <T extends TenantLike & { name: string; slug: string; appType: string }>(rows: UsageRow<T>[], days: number) =>
   [
-    ['Business', 'Subdomain', 'Type', 'Health', 'Score', `Sales ₵ (${days}d)`, 'Sales ₵ before', 'Transactions', 'Active days', 'Active staff', 'Staff', 'Minutes of use', 'Devices', 'Desktop devices', 'Offline sales', 'Last activity', 'Plan', 'Billing'],
+    [
+      'Business',
+      'Subdomain',
+      'Type',
+      'Health',
+      'Score',
+      `Sales ₵ (${days}d)`,
+      'Sales ₵ before',
+      'Transactions',
+      'Active days',
+      'Active staff',
+      'Staff',
+      'Minutes of use',
+      'Devices',
+      'Desktop devices',
+      'Offline sales',
+      'Last activity',
+      'Plan',
+      'Billing',
+    ],
     ...rows.map((r) => {
       const u = r.usage
       return [

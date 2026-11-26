@@ -16,7 +16,10 @@ const BACK_ONLINE_MS = 4000
 const time = (iso: string) => {
   const d = new Date(iso)
   const today = new Date().toDateString() === d.toDateString()
-  return d.toLocaleString(undefined, today ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString(
+    undefined,
+    today ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
+  )
 }
 
 const OpRow = ({ op, offline }: { op: Op; offline: OfflineState }) => {

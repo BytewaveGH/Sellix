@@ -22,11 +22,7 @@ const stub = async (p: PrintableTicket, parkName: string, note: string) => {
     <div class="ride">${esc(ride)}</div>
     <div class="small c">${p.ticket.quantity} × ${esc(money(p.price))} = <b>${esc(money(p.price * p.ticket.quantity))}</b></div>
     ${qr ? `<div class="qr">${qr}</div><div class="tcode">${esc(code)}</div>` : ''}
-    ${
-      p.offline
-        ? `<div class="box"><b>Sold offline</b><br>Show this ticket at the gate — staff will let you in.</div>`
-        : ''
-    }
+    ${p.offline ? `<div class="box"><b>Sold offline</b><br>Show this ticket at the gate — staff will let you in.</div>` : ''}
     <div class="meta">
       <div class="row"><span>Sold</span><span class="v">${esc(when(p.ticket.createdAt))}</span></div>
       ${p.ticket.buyerName ? `<div class="row"><span>For</span><span class="v">${esc(p.ticket.buyerName)}</span></div>` : ''}
@@ -48,7 +44,11 @@ const STYLE = `<style>
 
 export const ticketsHtml = async (tickets: PrintableTicket[], parkName: string, note: string, paper: PaperWidth = readPaperWidth()) => {
   const stubs = await Promise.all(tickets.map((t) => stub(t, parkName, note)))
-  return printPage(`Tickets ${tickets.map((t) => (t.offline ? 'offline' : `T${t.ticket.id}`)).join(', ')}`, STYLE + stubs.join('<div class="cut">✂ CUT HERE</div>'), paper)
+  return printPage(
+    `Tickets ${tickets.map((t) => (t.offline ? 'offline' : `T${t.ticket.id}`)).join(', ')}`,
+    STYLE + stubs.join('<div class="cut">✂ CUT HERE</div>'),
+    paper
+  )
 }
 
 export const printTickets = async (tickets: PrintableTicket[], parkName: string, note: string) =>

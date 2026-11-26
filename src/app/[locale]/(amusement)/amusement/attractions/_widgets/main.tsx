@@ -32,13 +32,17 @@ const Main = () => {
 
   const today = new Date().toDateString()
   const guestsToday = (id: number) =>
-    tickets.filter((t) => t.attractionId === id && t.createdAt && new Date(t.createdAt).toDateString() === today).reduce((n, t) => n + t.quantity, 0)
+    tickets
+      .filter((t) => t.attractionId === id && t.createdAt && new Date(t.createdAt).toDateString() === today)
+      .reduce((n, t) => n + t.quantity, 0)
 
   const setStatus = async (a: Attraction, status: Attraction['status']) => {
     if (a.status === status) return
     setError('')
     // Show it at once; put it back if the server says no.
-    qc.setQueryData(['attractions'], (old: unknown) => (Array.isArray(old) ? old.map((x: Attraction) => (x.id === a.id ? { ...x, status } : x)) : old))
+    qc.setQueryData(['attractions'], (old: unknown) =>
+      Array.isArray(old) ? old.map((x: Attraction) => (x.id === a.id ? { ...x, status } : x)) : old
+    )
     try {
       await request(AttractionServices.Update(a.id, { status }))
     } catch (err) {
@@ -71,7 +75,9 @@ const Main = () => {
           <CreateAttraction
             mode={editing && editing !== 'new' ? 'update' : 'create'}
             attractionId={editing && editing !== 'new' ? editing.id : undefined}
-            initialData={editing && editing !== 'new' ? (editing as React.ComponentProps<typeof CreateAttraction>['initialData']) : undefined}
+            initialData={
+              editing && editing !== 'new' ? (editing as React.ComponentProps<typeof CreateAttraction>['initialData']) : undefined
+            }
             onSuccess={() => {
               void refetch()
               setEditing(null)
@@ -123,7 +129,10 @@ const Main = () => {
                     {attractionTypeLabel(a.type)}
                   </span>
                   <p className="relative mt-2 text-xl font-black leading-tight">{a.name}</p>
-                  <span className={cn('absolute right-4 top-4 h-3 w-3 rounded-full ring-2 ring-white', STATUS[a.status]?.dot)} aria-hidden />
+                  <span
+                    className={cn('absolute right-4 top-4 h-3 w-3 rounded-full ring-2 ring-white', STATUS[a.status]?.dot)}
+                    aria-hidden
+                  />
                 </div>
                 <div className="p-4">
                   <div className="grid grid-cols-3 gap-2 text-center">
@@ -143,7 +152,11 @@ const Main = () => {
                       <p className="text-[11px] text-stone-500">today</p>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1" role="radiogroup" aria-label={`${a.name} status`}>
+                  <div
+                    className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1"
+                    role="radiogroup"
+                    aria-label={`${a.name} status`}
+                  >
                     {STATUSES.map((s) => (
                       <button
                         key={s}
@@ -165,7 +178,13 @@ const Main = () => {
                     <Button variant="ghost" size="sm" icon={Pencil} onClick={() => setEditing(a)}>
                       Edit
                     </Button>
-                    <Button variant="ghost" size="sm" icon={Trash2} onClick={() => setRemoving(a)} className="text-rose-600 hover:bg-rose-50">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={() => setRemoving(a)}
+                      className="text-rose-600 hover:bg-rose-50"
+                    >
                       Delete
                     </Button>
                   </div>

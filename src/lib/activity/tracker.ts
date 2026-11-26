@@ -86,7 +86,13 @@ export const createTracker = (opts: { scope: string; device: DeviceInfo; send: S
       sending = true
       const batch = queue.slice(0, BATCH)
       try {
-        await opts.send({ method: 'POST', url: ACTIVITY_URL, data: { device: opts.device, events: batch }, timeout: 10_000, offline: false })
+        await opts.send({
+          method: 'POST',
+          url: ACTIVITY_URL,
+          data: { device: opts.device, events: batch },
+          timeout: 10_000,
+          offline: false,
+        })
         queue = queue.slice(batch.length)
         save()
       } catch (err) {

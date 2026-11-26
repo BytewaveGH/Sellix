@@ -131,7 +131,12 @@ export const GetAppButton = ({ className, style }: { className?: string; style?:
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={icon} alt="" className="h-12 w-12 rounded-xl border border-stone-100" />
               <p className="min-w-0 flex-1 text-[15px] font-bold text-stone-900">Add {publicApp.name} to your home screen</p>
-              <button type="button" onClick={() => setHelp(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100">
+              <button
+                type="button"
+                onClick={() => setHelp(false)}
+                aria-label="Close"
+                className="h-8 w-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -200,13 +205,22 @@ export const InstallCard = ({ now = Date.now }: { now?: () => number }) => {
             {!publicApp && <WifiOff className="h-3.5 w-3.5 mt-px flex-shrink-0" />} {pitch}
           </p>
         </div>
-        <button type="button" onClick={close} aria-label="Not now" className="h-8 w-8 -mr-1 -mt-1 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100">
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Not now"
+          className="h-8 w-8 -mr-1 -mt-1 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
       {kind === 'prompt' ? (
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={close} className="h-11 flex-1 rounded-xl border border-stone-200 text-sm font-semibold text-stone-600">
+          <button
+            type="button"
+            onClick={close}
+            className="h-11 flex-1 rounded-xl border border-stone-200 text-sm font-semibold text-stone-600"
+          >
             Not now
           </button>
           <button

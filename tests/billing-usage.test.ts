@@ -5,15 +5,7 @@ import { applyAction, parseCatalog, type BillingAction } from '@/lib/subscriptio
 import { FEATURE_KEYS } from '@/lib/subscription/features'
 import { DEFAULT_CATALOG } from '@/lib/subscription/plans'
 import type { Catalog, Subscription } from '@/lib/subscription/types'
-import {
-  DEFAULT_USAGE_PRICING,
-  EMPTY_SALES,
-  feeClassOf,
-  ratesFor,
-  salesOf,
-  usageBill,
-  type UsageSales,
-} from '@/lib/subscription/usage'
+import { DEFAULT_USAGE_PRICING, EMPTY_SALES, feeClassOf, ratesFor, salesOf, usageBill, type UsageSales } from '@/lib/subscription/usage'
 
 const TZ = process.env.TZ
 beforeAll(() => {
@@ -91,7 +83,12 @@ describe('the bill', () => {
 
 describe('the plan', () => {
   it('includes every feature and unlimited staff', () => {
-    const access = accessFor(run(null, { type: 'assign', planId: usagePlan.id, cycle: 'yearly', trialDays: 14 }, '2026-11-01T10:00:00Z'), catalog.plans, catalog.settings, at('2026-11-02'))
+    const access = accessFor(
+      run(null, { type: 'assign', planId: usagePlan.id, cycle: 'yearly', trialDays: 14 }, '2026-11-01T10:00:00Z'),
+      catalog.plans,
+      catalog.settings,
+      at('2026-11-02')
+    )
     for (const f of FEATURE_KEYS) expect(canUseFeature(access, f)).toBe(true)
     expect(staffLimit(access)).toBeNull()
     expect(canAddStaff(access, 500)).toBe(true)

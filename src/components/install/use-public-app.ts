@@ -33,7 +33,12 @@ export const usePublicApp = (input: PublicAppInput | null | undefined) => {
     // iPhones use this, not the manifest, for the home-screen icon.
     const touch = ensure('link[rel="apple-touch-icon"]', () => Object.assign(document.createElement('link'), { rel: 'apple-touch-icon' }))
     const title = ensure(`meta[name="${APP_TITLE_META}"]`, () => Object.assign(document.createElement('meta'), { name: APP_TITLE_META }))
-    const saved = [manifest.el.getAttribute('href'), touch.el.getAttribute('href'), touch.el.getAttribute('sizes'), title.el.getAttribute('content')]
+    const saved = [
+      manifest.el.getAttribute('href'),
+      touch.el.getAttribute('href'),
+      touch.el.getAttribute('sizes'),
+      title.el.getAttribute('content'),
+    ]
 
     manifest.el.setAttribute('href', `/api/app-manifest?${key}`)
     // A logo kept in the page itself (saved on this device, not uploaded) can't
@@ -45,7 +50,11 @@ export const usePublicApp = (input: PublicAppInput | null | undefined) => {
     registerWorker()
     setPublicApp({ path: app.path, name: app.name, kind: /\/rentals(\/|$)/.test(app.path) ? 'rentals' : 'eat' })
 
-    const ours = { manifest: manifest.el.getAttribute('href'), touch: touch.el.getAttribute('href'), title: title.el.getAttribute('content') }
+    const ours = {
+      manifest: manifest.el.getAttribute('href'),
+      touch: touch.el.getAttribute('href'),
+      title: title.el.getAttribute('content'),
+    }
     // Put things back only if they're still what we set. Moving from Sellix
     // Eats to a storefront, Next has already written the storefront's manifest
     // into the page by the time this runs; putting Sellix Eats' back would make

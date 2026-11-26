@@ -31,9 +31,7 @@ const showSynced = (qc: QueryClient, result: SyncResult) => {
   for (const { path, row } of result.made) {
     for (const q of queries) {
       if (!queryPaths(q).includes(path)) continue
-      qc.setQueryData(q.queryKey, (old: unknown) =>
-        Array.isArray(old) && !old.some((x) => x?.id === row.id) ? [row, ...old] : old
-      )
+      qc.setQueryData(q.queryKey, (old: unknown) => (Array.isArray(old) && !old.some((x) => x?.id === row.id) ? [row, ...old] : old))
     }
   }
   void (queries.length ? qc.invalidateQueries({ predicate: touched }) : qc.invalidateQueries())
@@ -47,7 +45,8 @@ const MENU_PATHS = ['/eatery/restaurants', '/eatery/menu-categories', '/eatery/m
 
 // Straight to the server: never answered from, or kept in, the device's copies.
 const getChanges: Get = async (url, params) =>
-  (await apiClient.request({ method: 'GET', url, params, offline: false } as Parameters<typeof apiClient.request>[0] & OfflineConfig)).data?.data
+  (await apiClient.request({ method: 'GET', url, params, offline: false } as Parameters<typeof apiClient.request>[0] & OfflineConfig)).data
+    ?.data
 
 // Servers without the sync endpoints yet (404/405): not asked again this session.
 const noChangesEndpoint = new Set<string>()

@@ -85,7 +85,15 @@ describe('extras charged once per line', () => {
   })
 
   it('a promotion takes its share off the once-charged extras too', () => {
-    const promo = { id: 1, restaurantId: 1, name: 'Lunch', percentOff: 10, itemIds: [], categoryIds: [], active: true } as unknown as Promotion
+    const promo = {
+      id: 1,
+      restaurantId: 1,
+      name: 'Lunch',
+      percentOff: 10,
+      itemIds: [],
+      categoryIds: [],
+      active: true,
+    } as unknown as Promotion
     const price = linePrice(tz(true), fourWithFish.choices, undefined, [promo], now)
     // Only applies if the promotion is live now; either way the total is consistent.
     const priced = priceOrder(bundleWith(tz(true), [promo]), [fourWithFish], null, now)
@@ -108,7 +116,15 @@ describe('extras charged once per line', () => {
 
   it('stock: four portions of TZ use one fish', () => {
     const recipes = new Map<number, Recipe>([
-      [1, { itemId: 1, restaurantId: 1, ingredients: [{ ingredientId: 10, quantity: 1 }], choices: { fish: [{ ingredientId: 20, quantity: 1 }] } } as any],
+      [
+        1,
+        {
+          itemId: 1,
+          restaurantId: 1,
+          ingredients: [{ ingredientId: 10, quantity: 1 }],
+          choices: { fish: [{ ingredientId: 20, quantity: 1 }] },
+        } as any,
+      ],
     ])
     const once = lineUsage(fourWithFish, recipes, onceGroupIds(tz(true)))
     expect(once.get(10)).toBe(4)

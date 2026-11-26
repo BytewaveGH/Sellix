@@ -17,7 +17,23 @@ describe('last page', () => {
   it('keeps dashboard screens, never sign-in pages, public sites or odd paths', () => {
     expect(keepablePage('/en/eatery/menu')).toBe(true)
     expect(keepablePage('/fr/super-admin/apps/3?tab=usage')).toBe(true)
-    for (const p of ['/en', '/en/', '/en/staff', '/fr/forgot-password', '/en/select-app', '/en/super-admin/login', '/en/eat/kofi', '/en/rentals', '/en/amusement/board', 'https://evil.com/en/x', '//evil.com/x', '/en//evil.com', '/en/../x', '/de/x', '/en/a<b'])
+    for (const p of [
+      '/en',
+      '/en/',
+      '/en/staff',
+      '/fr/forgot-password',
+      '/en/select-app',
+      '/en/super-admin/login',
+      '/en/eat/kofi',
+      '/en/rentals',
+      '/en/amusement/board',
+      'https://evil.com/en/x',
+      '//evil.com/x',
+      '/en//evil.com',
+      '/en/../x',
+      '/de/x',
+      '/en/a<b',
+    ])
       expect(keepablePage(p)).toBe(false)
   })
 
@@ -36,9 +52,18 @@ describe('last page', () => {
 
 describe('RememberPage', () => {
   const clear = () => (document.cookie = `${LAST_PAGE_COOKIE}=; Path=/; Max-Age=0`)
-  const saved = () => document.cookie.split('; ').find((c) => c.startsWith(`${LAST_PAGE_COOKIE}=`))?.slice(LAST_PAGE_COOKIE.length + 1)
+  const saved = () =>
+    document.cookie
+      .split('; ')
+      .find((c) => c.startsWith(`${LAST_PAGE_COOKIE}=`))
+      ?.slice(LAST_PAGE_COOKIE.length + 1)
   const standalone = (on: boolean) =>
-    (window.matchMedia = ((q: string) => ({ matches: on && q.includes('standalone'), media: q, addEventListener() {}, removeEventListener() {} })) as any)
+    (window.matchMedia = ((q: string) => ({
+      matches: on && q.includes('standalone'),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as any)
 
   beforeEach(() => {
     clear()

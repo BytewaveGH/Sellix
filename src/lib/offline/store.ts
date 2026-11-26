@@ -93,8 +93,7 @@ const fallbackOnError = (primary: OfflineStore): OfflineStore => {
 
 let shared: OfflineStore | null = null
 
-export const offlineStore = (): OfflineStore =>
-  (shared ??= typeof indexedDB === 'undefined' ? memoryStore() : fallbackOnError(idbStore()))
+export const offlineStore = (): OfflineStore => (shared ??= typeof indexedDB === 'undefined' ? memoryStore() : fallbackOnError(idbStore()))
 
 // Tests swap in their own.
 export const setOfflineStore = (s: OfflineStore | null) => {

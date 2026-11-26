@@ -805,11 +805,27 @@ The dashboard sends these back unchanged on every property or unit update, so `P
 - `GET /real-estate/site` returns the settings (shape below), or 404 if they have never been saved; the frontend uses defaults then. `PUT /real-estate/site` replaces them and returns the saved record. One record per tenant. Writing needs the same permission as editing properties (`canManageProducts`).
 
   ```json
-  { "published": false, "name": "", "tagline": "", "about": "", "phone": "", "whatsapp": "",
-    "email": "", "accent": "#0865AC", "showPrices": true, "showAddress": false, "showSoon": true, "rentTerms": "",
-    "logoUrl": null, "coverUrl": null, "showInDirectory": true }
+  {
+    "published": false,
+    "name": "",
+    "tagline": "",
+    "about": "",
+    "phone": "",
+    "whatsapp": "",
+    "email": "",
+    "accent": "#0865AC",
+    "showPrices": true,
+    "showAddress": false,
+    "showSoon": true,
+    "rentTerms": "",
+    "logoUrl": null,
+    "coverUrl": null,
+    "showInDirectory": true
+  }
   ```
+
   `logoUrl` and `coverUrl` come from `POST /real-estate/images`. The logo is a 512 px square WebP.
+
 - `POST /real-estate/images`: multipart with a `file` field (JPEG or WebP, already resized by the browser to 500 KB or less). Returns `{ "url": "https://…" }`, which must be a public URL that anyone can load, because it appears on the public page. Reject files over 2 MB and anything that isn't an image.
 
 ### 12.3 Public endpoints (no token; the business is picked by `X-Tenant-Domain`)
@@ -817,17 +833,49 @@ The dashboard sends these back unchanged on every property or unit update, so `P
 - `GET /public/real-estate/site` returns 404 when the tenant doesn't exist, `published` is false, or the tenant's plan doesn't include the `real-estate.website` feature (§8; Growth and Pro by default). Otherwise it returns `PublicSite`:
 
   ```json
-  { "slug": "acme", "on": "2026-11-03",
-    "site": { /* settings without `published` */ },
-    "properties": [{ "id": 1, "name": "", "type": "compound-house", "address": "", "city": "", "region": "",
-                     "description": "", "gpsAddress": "", "photos": [] }],
-    "listings": [{ "id": 4, "propertyId": 1, "name": "Room 4", "typeName": "Chamber & hall (self-contained)",
-                   "description": "", "rentalMode": "long-term", "price": 600, "bedrooms": 1, "livingRooms": 1,
-                   "facilities": { "bathroom": "private" }, "amenities": [], "maxGuests": 0, "photos": [],
-                   "availability": { "state": "now" }, "booked": [] }] }
+  {
+    "slug": "acme",
+    "on": "2026-11-03",
+    "site": {
+      /* settings without `published` */
+    },
+    "properties": [
+      {
+        "id": 1,
+        "name": "",
+        "type": "compound-house",
+        "address": "",
+        "city": "",
+        "region": "",
+        "description": "",
+        "gpsAddress": "",
+        "photos": []
+      }
+    ],
+    "listings": [
+      {
+        "id": 4,
+        "propertyId": 1,
+        "name": "Room 4",
+        "typeName": "Chamber & hall (self-contained)",
+        "description": "",
+        "rentalMode": "long-term",
+        "price": 600,
+        "bedrooms": 1,
+        "livingRooms": 1,
+        "facilities": { "bathroom": "private" },
+        "amenities": [],
+        "maxGuests": 0,
+        "photos": [],
+        "availability": { "state": "now" },
+        "booked": []
+      }
+    ]
+  }
   ```
 
   Rules (as in `publicSite()`):
+
   - **Properties:** only `listed` ones, never `land`.
   - **Units:** only `availability = available`.
   - **Long-term units:**
@@ -841,7 +889,9 @@ The dashboard sends these back unchanged on every property or unit update, so `P
   - **Privacy:** never include tenants, leases, payments, guest names or phones, unit notes, purchase details or documents.
 
   Cache it for a minute or so; it's the page people share around.
+
 - `POST /public/real-estate/booking-requests`, with body `{ unitId, checkIn, checkOut, guests, name, phone, note? }`, creates a booking with these fields:
+
   - `status: "inquiry"`
   - `channel: "direct"`
   - `nightlyRate`: the unit's rate
@@ -849,6 +899,7 @@ The dashboard sends these back unchanged on every property or unit update, so `P
   - `notes`: starts with "Requested on the website on {date}." followed by the guest's note.
 
   Re-check everything on the server, as `acceptBookingRequest()` does:
+
   - **404** if the site isn't published or the unit isn't a listed short stay.
   - **422** for bad dates (in the past, `checkOut <= checkIn`, or more than 90 nights), guests above `maxGuests`, or a missing name or phone.
   - **409** if the nights overlap a `confirmed` or `checked-in` booking.
@@ -863,7 +914,6 @@ The dashboard sends these back unchanged on every property or unit update, so `P
 - It reads across tenant databases, so build it from a cached, platform-level index that is refreshed when a tenant's site settings, units, leases or bookings change, rather than querying every tenant per request. A few minutes of staleness is fine.
 - Rooms link to `/{locale}/rentals/{slug}/{unitId}`, so `slug` must be the tenant slug that §12.3 accepts.
 
-
 ## 13. Offline selling: tills that keep working without internet (changes to `sellix.apis`)
 
 Shops lose internet often. The plan is for the till (POS) to keep selling while offline and send its sales when the connection returns:
@@ -876,7 +926,7 @@ Shops lose internet often. The plan is for the till (POS) to keep selling while 
 Today's sale endpoint can't support this safely, for four reasons:
 
 - **Duplicates on retry.** `POST /sales` has no ID from the till, so a retry after a lost reply records the sale twice.
-- **Wrong date.** The sale is dated when it *reaches* the server, not when it happened. A sale made at 10:00 and synced at 16:00 lands on the wrong hour, or the wrong day if synced after midnight.
+- **Wrong date.** The sale is dated when it _reaches_ the server, not when it happened. A sale made at 10:00 and synced at 16:00 lands on the wrong hour, or the wrong day if synced after midnight.
 - **Rejected for stock.** It refuses the sale when stock is short (`ErrInsufficientStock`, `app/application/sale/repository.go:123`). Two tills that were both offline can legitimately sell the last units, and both sales really happened.
 - **Re-priced.** Each item is re-priced from the current unit price (`ResolveItemPrice`). If the price changed while the till was offline, the record no longer matches what the customer paid.
 
@@ -909,11 +959,13 @@ Add to `CreateSaleRequest` (`POST /sales`):
 `POST /sync/sales` with `{ "sales": [ ...same shape as 13.1, up to 200 ] }`. Process them in order, each in its own transaction, and return one result per sale so a single bad sale doesn't block the rest:
 
 ```json
-{ "results": [
-  { "clientId": "6f1c…", "status": "created", "id": 9812 },
-  { "clientId": "a40e…", "status": "duplicate", "id": 9790 },
-  { "clientId": "c1d2…", "status": "rejected", "code": "product_unit_deleted", "message": "Coca-Cola 500ml (Bottle) no longer exists" }
-] }
+{
+  "results": [
+    { "clientId": "6f1c…", "status": "created", "id": 9812 },
+    { "clientId": "a40e…", "status": "duplicate", "id": 9790 },
+    { "clientId": "c1d2…", "status": "rejected", "code": "product_unit_deleted", "message": "Coca-Cola 500ml (Bottle) no longer exists" }
+  ]
+}
 ```
 
 - **Status codes:** `created` | `duplicate` | `rejected`.
@@ -935,10 +987,16 @@ The till keeps the catalogue on the PC. Instead of downloading everything each t
 ```json
 {
   "cursor": "2026-11-11T10:05:00.123456Z",
-  "products": [ /* same shape as GET /products, with units, barcodes and aliases */ ],
-  "stock": [ { "productId": 41, "warehouseId": 3, "quantity": 118 } ],
-  "warehouses": [ /* … */ ],
-  "settings": { /* store settings (§11.1), when changed */ },
+  "products": [
+    /* same shape as GET /products, with units, barcodes and aliases */
+  ],
+  "stock": [{ "productId": 41, "warehouseId": 3, "quantity": 118 }],
+  "warehouses": [
+    /* … */
+  ],
+  "settings": {
+    /* store settings (§11.1), when changed */
+  },
   "deleted": { "products": [17, 23], "productUnits": [88], "warehouses": [] }
 }
 ```
@@ -957,7 +1015,7 @@ The till keeps the catalogue on the PC. Instead of downloading everything each t
 
 ### 13.5 Logins on bad internet (frontend note, no backend change)
 
-The frontend will stop logging cashiers out when a token refresh fails *because the network is down*. Only a real 401 from the refresh endpoint will end the session. No backend change is needed, but please keep the refresh token valid for at least a few days, so a till that was offline overnight can still refresh in the morning.
+The frontend will stop logging cashiers out when a token refresh fails _because the network is down_. Only a real 401 from the refresh endpoint will end the session. No backend change is needed, but please keep the refresh token valid for at least a few days, so a till that was offline overnight can still refresh in the morning.
 
 ## 14. Platform analytics: usage and engagement per business (new)
 

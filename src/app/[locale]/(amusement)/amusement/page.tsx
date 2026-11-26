@@ -7,7 +7,19 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { CalendarCheck, DoorOpen, ExternalLink, PartyPopper, ScanLine, Sparkles, Ticket, TrendingDown, TrendingUp, Users, Wallet } from 'lucide-react'
+import {
+  CalendarCheck,
+  DoorOpen,
+  ExternalLink,
+  PartyPopper,
+  ScanLine,
+  Sparkles,
+  Ticket,
+  TrendingDown,
+  TrendingUp,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import { BarChart, Card, EmptyState, LoadingGrid, Ring, SectionTitle, StatCard } from '@/components/kit/ui'
 import { cn } from '@/lib/utils'
 import { hourLabel, money, parkDay, trend } from '@/lib/amusement/park'
@@ -25,7 +37,19 @@ const useNow = (ms = 30_000) => {
   return now
 }
 
-const QuickAction = ({ href, icon: Icon, label, hint, external }: { href: string; icon: React.ElementType; label: string; hint: string; external?: boolean }) => (
+const QuickAction = ({
+  href,
+  icon: Icon,
+  label,
+  hint,
+  external,
+}: {
+  href: string
+  icon: React.ElementType
+  label: string
+  hint: string
+  external?: boolean
+}) => (
   <Link
     href={href}
     target={external ? '_blank' : undefined}
@@ -52,7 +76,10 @@ export default function ParkOverview() {
   const { attractions, isLoading: loadingA } = useAttractions()
   const { tickets, isLoading: loadingT } = useTickets()
   const { bookings } = useBookings()
-  const day = useMemo(() => parkDay(tickets, attractions, bookings, now, settings.admissionPrice), [tickets, attractions, bookings, now, settings.admissionPrice])
+  const day = useMemo(
+    () => parkDay(tickets, attractions, bookings, now, settings.admissionPrice),
+    [tickets, attractions, bookings, now, settings.admissionPrice]
+  )
   const change = trend(day.sold, day.soldYesterdaySoFar)
   const loading = (loadingA && !attractions.length) || (loadingT && !tickets.length)
   const peopleByRide = new Map(day.byAttraction.map((a) => [a.id, a.people]))
@@ -87,8 +114,12 @@ export default function ParkOverview() {
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:w-[560px]">
             {canSell && <QuickAction href={`/${locale}/amusement/counter`} icon={Ticket} label="Sell tickets" hint="The ticket counter" />}
-            {canSell && <QuickAction href={`/${locale}/amusement/gate`} icon={ScanLine} label="Gate check-in" hint="Scan tickets at the entrance" />}
-            {canSell && <QuickAction href={`/${locale}/amusement/wheel`} icon={PartyPopper} label="Prize wheel" hint="Spin to win, for promos" />}
+            {canSell && (
+              <QuickAction href={`/${locale}/amusement/gate`} icon={ScanLine} label="Gate check-in" hint="Scan tickets at the entrance" />
+            )}
+            {canSell && (
+              <QuickAction href={`/${locale}/amusement/wheel`} icon={PartyPopper} label="Prize wheel" hint="Spin to win, for promos" />
+            )}
             <QuickAction href={`/${locale}/amusement/board`} icon={Sparkles} label="Hall of Fame" hint="For the lobby screen" external />
           </div>
         </div>
@@ -119,11 +150,15 @@ export default function ParkOverview() {
             />
             <Card className="flex items-center gap-4 p-4 sm:p-5">
               <Ring value={day.sold ? day.admitted / day.sold : 0} size={68}>
-                <span className="text-sm font-extrabold tabular-nums text-stone-900">{day.sold ? Math.round((day.admitted / day.sold) * 100) : 0}%</span>
+                <span className="text-sm font-extrabold tabular-nums text-stone-900">
+                  {day.sold ? Math.round((day.admitted / day.sold) * 100) : 0}%
+                </span>
               </Ring>
               <div>
                 <p className="text-xs font-semibold text-stone-500">Through the gate</p>
-                <p className="text-[26px] font-extrabold leading-none tracking-tight text-stone-900 tabular-nums">{day.admitted.toLocaleString()}</p>
+                <p className="text-[26px] font-extrabold leading-none tracking-tight text-stone-900 tabular-nums">
+                  {day.admitted.toLocaleString()}
+                </p>
                 <p className="mt-1.5 text-xs text-stone-500">of {day.sold.toLocaleString()} with tickets</p>
               </div>
             </Card>
@@ -148,12 +183,21 @@ export default function ParkOverview() {
               <SectionTitle title="Tickets sold, hour by hour" hint="Guests per hour today" />
               {day.sold ? (
                 <BarChart
-                  data={day.hourly.map((h) => ({ key: String(h.hour), label: hourLabel(h.hour), value: h.people, detail: `${hourLabel(h.hour)} – ${hourLabel((h.hour + 1) % 24)}` }))}
+                  data={day.hourly.map((h) => ({
+                    key: String(h.hour),
+                    label: hourLabel(h.hour),
+                    value: h.people,
+                    detail: `${hourLabel(h.hour)} – ${hourLabel((h.hour + 1) % 24)}`,
+                  }))}
                   format={(n) => `${Math.round(n)}`}
                   ariaLabel="Guests per hour today"
                 />
               ) : (
-                <EmptyState icon={Ticket} title="No sales yet today" description="Sales show here hour by hour as the counter sells tickets." />
+                <EmptyState
+                  icon={Ticket}
+                  title="No sales yet today"
+                  description="Sales show here hour by hour as the counter sells tickets."
+                />
               )}
             </Card>
             <Card className="p-5">
@@ -169,7 +213,10 @@ export default function ParkOverview() {
                           <p className="text-sm font-bold tabular-nums text-stone-900">{a.people}</p>
                         </div>
                         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100">
-                          <div className="h-full rounded-full bg-violet-500" style={{ width: `${(a.people / day.byAttraction[0].people) * 100}%` }} />
+                          <div
+                            className="h-full rounded-full bg-violet-500"
+                            style={{ width: `${(a.people / day.byAttraction[0].people) * 100}%` }}
+                          />
                         </div>
                       </div>
                     </li>
@@ -230,7 +277,9 @@ export default function ParkOverview() {
                             isToday ? 'bg-violet-600 text-white' : 'bg-violet-50 text-violet-700'
                           )}
                         >
-                          <span className="text-[10px] font-bold uppercase">{new Date(b.date).toLocaleDateString(undefined, { month: 'short' })}</span>
+                          <span className="text-[10px] font-bold uppercase">
+                            {new Date(b.date).toLocaleDateString(undefined, { month: 'short' })}
+                          </span>
                           <span className="text-base font-black">{new Date(b.date).getDate()}</span>
                         </span>
                         <div className="min-w-0 flex-1">

@@ -65,7 +65,8 @@ const Spotlight = ({ board }: { board: Board }) => {
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-white/70">Park record</p>
                 <p className="text-2xl font-black">
-                  {formatScore(board.rows[0].score, board.metric)} <span className="font-semibold text-white/80">· {board.rows[0].participantName}</span>
+                  {formatScore(board.rows[0].score, board.metric)}{' '}
+                  <span className="font-semibold text-white/80">· {board.rows[0].participantName}</span>
                 </p>
               </div>
             </div>
@@ -92,7 +93,12 @@ const Spotlight = ({ board }: { board: Board }) => {
               <div key={place} className="flex w-28 flex-col items-center sm:w-36">
                 {r ? (
                   <>
-                    <span className={cn('flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-xl font-black ring-4 sm:h-20 sm:w-20 sm:text-2xl', ring)}>
+                    <span
+                      className={cn(
+                        'flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-xl font-black ring-4 sm:h-20 sm:w-20 sm:text-2xl',
+                        ring
+                      )}
+                    >
                       {initials(r.participantName)}
                     </span>
                     <p className="mt-2 max-w-full truncate text-center text-base font-bold">{r.participantName}</p>
@@ -116,9 +122,14 @@ const Spotlight = ({ board }: { board: Board }) => {
 const MiniBoard = ({ board, active }: { board: Board; active: boolean }) => {
   const Icon = attractionTypeIcon(board.type)
   return (
-    <div className={cn('rounded-3xl border bg-white/[0.04] p-5 transition', active ? 'border-white/40 bg-white/[0.08]' : 'border-white/10')}>
+    <div
+      className={cn('rounded-3xl border bg-white/[0.04] p-5 transition', active ? 'border-white/40 bg-white/[0.08]' : 'border-white/10')}
+    >
       <div className="mb-4 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ backgroundImage: attractionGradient(board.type) }}>
+        <span
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
+          style={{ backgroundImage: attractionGradient(board.type) }}
+        >
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0">
@@ -132,7 +143,13 @@ const MiniBoard = ({ board, active }: { board: Board; active: boolean }) => {
             <span
               className={cn(
                 'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-black',
-                i === 0 ? 'bg-yellow-300 text-yellow-950' : i === 1 ? 'bg-slate-200 text-slate-900' : i === 2 ? 'bg-orange-300 text-orange-950' : 'bg-white/10 text-white/60'
+                i === 0
+                  ? 'bg-yellow-300 text-yellow-950'
+                  : i === 1
+                    ? 'bg-slate-200 text-slate-900'
+                    : i === 2
+                      ? 'bg-orange-300 text-orange-950'
+                      : 'bg-white/10 text-white/60'
               )}
             >
               {i + 1}
@@ -196,7 +213,12 @@ export default function HallOfFame() {
       if (fresh) {
         setRecord(fresh)
         setBurst((b) => b + 1)
-        setSpot(Math.max(0, boards.findIndex((b) => b.attractionId === fresh.attractionId)))
+        setSpot(
+          Math.max(
+            0,
+            boards.findIndex((b) => b.attractionId === fresh.attractionId)
+          )
+        )
         const t = setTimeout(() => setRecord(null), CELEBRATE_MS)
         previous.current = boards
         return () => clearTimeout(t)
@@ -248,7 +270,10 @@ export default function HallOfFame() {
             {boards.length > 1 && (
               <div className="mt-4 flex justify-center gap-1.5" aria-hidden>
                 {boards.map((b, i) => (
-                  <span key={b.attractionId} className={cn('h-1.5 rounded-full transition-all', i === spot % boards.length ? 'w-8 bg-white' : 'w-1.5 bg-white/30')} />
+                  <span
+                    key={b.attractionId}
+                    className={cn('h-1.5 rounded-full transition-all', i === spot % boards.length ? 'w-8 bg-white' : 'w-1.5 bg-white/30')}
+                  />
                 ))}
               </div>
             )}

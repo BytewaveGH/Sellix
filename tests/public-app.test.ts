@@ -6,10 +6,20 @@ import sharp from 'sharp'
 // Logo hosts resolve to a public address unless the test says otherwise.
 const dns = vi.hoisted(() => ({ addrs: {} as Record<string, string[]> }))
 vi.mock('node:dns/promises', () => ({
-  lookup: async (host: string) => (dns.addrs[host] ?? ['93.184.216.34']).map((address) => ({ address, family: address.includes(':') ? 6 : 4 })),
+  lookup: async (host: string) =>
+    (dns.addrs[host] ?? ['93.184.216.34']).map((address) => ({ address, family: address.includes(':') ? 6 : 4 })),
 }))
 
-import { isPublicAddress, logoUrlProblem, iconParams, parseAppParams, publicAppMetadata, publicAppName, publicManifest, shortName } from '@/lib/public-app'
+import {
+  isPublicAddress,
+  logoUrlProblem,
+  iconParams,
+  parseAppParams,
+  publicAppMetadata,
+  publicAppName,
+  publicManifest,
+  shortName,
+} from '@/lib/public-app'
 import { GET as manifestRoute } from '@/app/api/app-manifest/route'
 import { GET as iconRoute } from '@/app/api/app-icon/route'
 
@@ -19,7 +29,14 @@ describe('public app manifest', () => {
   it('opens on the storefront and keeps checkout and order tracking inside the app', () => {
     const p = parseAppParams(q({ path: '/en/eat/kofi-and-crumb', name: 'Kofi & Crumb', bg: '#D4572A', fg: '#ffffff' }))!
     const m = publicManifest(p)
-    expect(m).toMatchObject({ id: '/en/eat/kofi-and-crumb', start_url: '/en/eat/kofi-and-crumb', scope: '/en/eat/kofi-and-crumb', name: 'Kofi & Crumb', theme_color: '#D4572A', display: 'standalone' })
+    expect(m).toMatchObject({
+      id: '/en/eat/kofi-and-crumb',
+      start_url: '/en/eat/kofi-and-crumb',
+      scope: '/en/eat/kofi-and-crumb',
+      name: 'Kofi & Crumb',
+      theme_color: '#D4572A',
+      display: 'standalone',
+    })
     expect('/en/eat/kofi-and-crumb/checkout'.startsWith(m.scope)).toBe(true)
     expect(m.icons.map((i) => `${i.sizes} ${i.purpose}`)).toEqual(['192x192 any', '512x512 any', '512x512 maskable'])
   })
@@ -40,10 +57,32 @@ describe('public app manifest', () => {
 
   it('logos come from anywhere public, never inside our own network', () => {
     for (const ip of ['93.184.216.34', '8.8.8.8', '2606:4700::1111', '172.32.0.1']) expect(isPublicAddress(ip)).toBe(true)
-    for (const ip of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', '::', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '::ffff:7f00:1', '999.1.1.1'])
+    for (const ip of [
+      '127.0.0.1',
+      '10.1.2.3',
+      '172.16.0.1',
+      '192.168.1.1',
+      '169.254.169.254',
+      '100.64.0.1',
+      '0.0.0.0',
+      '::1',
+      '::',
+      'fd00::1',
+      'fe80::1',
+      '::ffff:127.0.0.1',
+      '::ffff:7f00:1',
+      '999.1.1.1',
+    ])
       expect(isPublicAddress(ip)).toBe(false)
     expect(logoUrlProblem('https://res.cloudinary.com/x/logo.png')).toBeNull()
-    for (const u of ['http://cdn.example.com/a.png', 'https://user:pw@cdn.example.com/a.png', 'https://cdn.example.com:8443/a.png', 'https://localhost/a.png', 'https://db.internal/a.png', 'nope'])
+    for (const u of [
+      'http://cdn.example.com/a.png',
+      'https://user:pw@cdn.example.com/a.png',
+      'https://cdn.example.com:8443/a.png',
+      'https://localhost/a.png',
+      'https://db.internal/a.png',
+      'nope',
+    ])
       expect(logoUrlProblem(u)).not.toBeNull()
     expect(iconParams(q({ size: '9999', text: '<s>' }))).toMatchObject({ size: 192, text: 'S' })
   })
@@ -72,7 +111,9 @@ describe('public app manifest', () => {
   })
 
   const pixel = async (res: Response, x: number, y: number) => {
-    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer())).raw().toBuffer({ resolveWithObject: true })
+    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer()))
+      .raw()
+      .toBuffer({ resolveWithObject: true })
     const i = (y * info.width + x) * info.channels
     return { size: [info.width, info.height], rgb: [data[i], data[i + 1], data[i + 2]] }
   }
@@ -88,7 +129,11 @@ describe('public app manifest', () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
     try {
-      const other = await pixel(await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fsneaky.example%2Fa.png')), 2, 2)
+      const other = await pixel(
+        await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fsneaky.example%2Fa.png')),
+        2,
+        2
+      )
       expect(other).toEqual({ size: [192, 192], rgb: [255, 255, 255] })
       expect(fetchSpy).not.toHaveBeenCalled()
     } finally {
@@ -97,8 +142,13 @@ describe('public app manifest', () => {
   })
 
   it('with a logo: uses the storefront’s logo, wherever it is stored', async () => {
-    const red = await sharp({ create: { width: 300, height: 300, channels: 3, background: '#E01010' } }).png().toBuffer()
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(red), { headers: { 'content-type': 'image/png' } })))
+    const red = await sharp({ create: { width: 300, height: 300, channels: 3, background: '#E01010' } })
+      .png()
+      .toBuffer()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array(red), { headers: { 'content-type': 'image/png' } }))
+    )
     try {
       const res = await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fres.cloudinary.com%2Fsellix%2Flogo.png'))
       expect((await pixel(res, 96, 96)).rgb).toEqual([224, 16, 16])

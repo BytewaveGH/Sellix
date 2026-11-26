@@ -238,7 +238,8 @@ export const useEateryActions = () => {
   const [error, setError] = useState<{ message: string } | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['eatery', source.kind] })
   // The menu already on this device, to price a counter order made offline.
-  const loaded = <R extends ResourceName>(r: R) => (qc.getQueryData(['eatery', source.kind, 'owner', scope, r]) as ResourceMap[R][] | undefined) ?? []
+  const loaded = <R extends ResourceName>(r: R) =>
+    (qc.getQueryData(['eatery', source.kind, 'owner', scope, r]) as ResourceMap[R][] | undefined) ?? []
   // `input` already carries the till's clientId, receipt number and time.
   const offlinePreview = (restaurantId: number, input: CounterOrderInput, now: Date) => {
     const restaurant = loaded('restaurants').find((r) => r.id === restaurantId)
@@ -287,7 +288,8 @@ export const useEateryActions = () => {
     createCounterOrder: (restaurantId: number, input: CounterOrderInput) => {
       // One id and receipt number for this order, however it reaches the server.
       const now = new Date()
-      const order: CounterOrderInput = source.kind === 'api' ? { ...input, clientId: newClientId(), ...tillFields(nextReceiptNo(), now) } : input
+      const order: CounterOrderInput =
+        source.kind === 'api' ? { ...input, clientId: newClientId(), ...tillFields(nextReceiptNo(), now) } : input
       const local = offlinePreview(restaurantId, order, now)
       // With a local record the till is done at once; without (menu not loaded) it's a live order.
       return run(() => source.createCounterOrder(restaurantId, order, local), 'Couldn’t send the order.', false, local ? 'none' : 'wait')

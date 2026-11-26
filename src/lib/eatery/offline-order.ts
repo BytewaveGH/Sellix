@@ -85,6 +85,4 @@ export const offlineOrderBody = (menu: MenuOnDevice, input: CounterOrderInput, n
 
 // Menu item id → name, for "no longer on the menu" refusals.
 export const itemNames = (menu: MenuOnDevice, input: CounterOrderInput) =>
-  Object.fromEntries(
-    input.lines.map((l) => [String(l.itemId), menu.items.find((i) => i.id === l.itemId)?.name ?? `item ${l.itemId}`])
-  )
+  Object.fromEntries(input.lines.map((l) => [String(l.itemId), menu.items.find((i) => i.id === l.itemId)?.name ?? `item ${l.itemId}`]))
