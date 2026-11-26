@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { usePublicApp } from '@/components/install/use-public-app'
 import {
   ArrowRight,
   BadgePercent,
@@ -80,6 +81,7 @@ const Rail = ({
 export default function EatDirectory() {
   const params = useParams()
   const locale = (params?.locale as string) || 'en'
+  usePublicApp({ path: `/${locale}/eat`, name: 'Sellix Eats', bg: '#0865AC', fg: '#FFFFFF' })
   const now = useNow()
   const { data, isLoading, error, refetch, isFetching } = useDirectory()
   const tickets = useCart((s) => s.tickets)

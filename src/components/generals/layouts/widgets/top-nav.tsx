@@ -9,6 +9,7 @@ import { dashboardAppType } from '@/lib/app-type'
 import { useSession } from 'next-auth/react'
 import { ThemeSwitch } from '@/components/theme/theme'
 import { ConnectionBadge } from '@/components/connection/connection-badge'
+import { InstallApp } from '@/components/install/install-app'
 
 interface TopNavProps {
   trigger?: any
@@ -45,6 +46,7 @@ const TopNav = ({ trigger }: TopNavProps) => {
           },
         ]
       : []),
+    { id: 9, label: 'Install', comp: <InstallApp /> },
     { id: 8, label: 'Connection', comp: <ConnectionBadge /> },
     { id: 7, label: 'Theme', comp: <ThemeSwitch compact /> },
     {
