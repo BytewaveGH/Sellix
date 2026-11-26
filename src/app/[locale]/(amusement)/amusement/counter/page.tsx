@@ -29,7 +29,17 @@ const GENERAL = { id: null, name: 'General admission', type: 'other' } as const
 
 const PRINT_KEY = 'sellix-amusement:print-tickets'
 
-const SettingsDrawer = ({ open, onClose, settings, save }: { open: boolean; onClose: () => void; settings: ParkSettings; save: (s: ParkSettings) => void }) => {
+const SettingsDrawer = ({
+  open,
+  onClose,
+  settings,
+  save,
+}: {
+  open: boolean
+  onClose: () => void
+  settings: ParkSettings
+  save: (s: ParkSettings) => void
+}) => {
   const [draft, setDraft] = useState(settings)
   const [paper, setPaper] = usePaperWidth()
   const [preview, setPreview] = useState('')
@@ -72,7 +82,11 @@ const SettingsDrawer = ({ open, onClose, settings, save }: { open: boolean; onCl
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
           <Field label="Park name" hint="At the top of every ticket and the dashboard.">
-            <Input value={draft.parkName} onChange={(e) => setDraft({ ...draft, parkName: e.target.value })} placeholder="e.g. Bambo Adventure Park" />
+            <Input
+              value={draft.parkName}
+              onChange={(e) => setDraft({ ...draft, parkName: e.target.value })}
+              placeholder="e.g. Bambo Adventure Park"
+            />
           </Field>
           <Field label="General admission price" hint="For park-entry tickets that aren’t for one ride.">
             <Input
@@ -124,7 +138,9 @@ export default function TicketCounter() {
   const total = lines.reduce((n, l) => n + l.quantity * price(l.attractionId), 0)
   const guests = lines.reduce((n, l) => n + l.quantity, 0)
   // Open rides first, then the rest (shown, but can't be sold).
-  const ordered = [...attractions].sort((a, b) => Number(a.status !== 'active') - Number(b.status !== 'active') || a.name.localeCompare(b.name))
+  const ordered = [...attractions].sort(
+    (a, b) => Number(a.status !== 'active') - Number(b.status !== 'active') || a.name.localeCompare(b.name)
+  )
 
   const add = (attractionId: number | null, by = 1) =>
     setLines((ls) => {
@@ -145,10 +161,17 @@ export default function TicketCounter() {
       // One ticket per line: "ADMIT 3 · Go-Karts". The API takes one attraction per ticket.
       while (left.length) {
         const line = left[0]
-        const res = await request(TicketServices.Create({ attractionId: line.attractionId, buyerName: buyer.trim() || undefined, quantity: line.quantity }))
+        const res = await request(
+          TicketServices.Create({ attractionId: line.attractionId, buyerName: buyer.trim() || undefined, quantity: line.quantity })
+        )
         const ticket = (res?.data?.data ?? res?.data) as TicketRow
         done.push({
-          ticket: { ...ticket, quantity: ticket.quantity ?? line.quantity, attractionId: ticket.attractionId ?? line.attractionId, createdAt: ticket.createdAt },
+          ticket: {
+            ...ticket,
+            quantity: ticket.quantity ?? line.quantity,
+            attractionId: ticket.attractionId ?? line.attractionId,
+            createdAt: ticket.createdAt,
+          },
           attraction: line.attractionId != null ? byId.get(line.attractionId) : undefined,
           price: price(line.attractionId),
           offline: offlineKind(res) === 'queued',
@@ -192,13 +215,19 @@ export default function TicketCounter() {
         )}
         style={{ backgroundImage: attractionGradient(a.type) }}
       >
-        <Icon className="absolute -bottom-3 -right-3 h-20 w-20 text-white/15 transition group-hover:rotate-6" strokeWidth={1.5} aria-hidden />
+        <Icon
+          className="absolute -bottom-3 -right-3 h-20 w-20 text-white/15 transition group-hover:rotate-6"
+          strokeWidth={1.5}
+          aria-hidden
+        />
         <span className="flex items-start justify-between gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
             <Icon className="h-5 w-5" />
           </span>
           {inCart > 0 && (
-            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-sm font-black text-stone-900 shadow">{inCart}</span>
+            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-sm font-black text-stone-900 shadow">
+              {inCart}
+            </span>
           )}
           {disabled && (
             <span className="inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] font-bold">
@@ -251,7 +280,11 @@ export default function TicketCounter() {
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[15px] font-bold text-stone-900">This sale</p>
             {lines.length > 0 && (
-              <button type="button" onClick={() => setLines([])} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-400 hover:text-rose-600">
+              <button
+                type="button"
+                onClick={() => setLines([])}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-stone-400 hover:text-rose-600"
+              >
                 <Trash2 className="h-3.5 w-3.5" /> Clear
               </button>
             )}
@@ -269,11 +302,21 @@ export default function TicketCounter() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <button type="button" aria-label="One fewer" onClick={() => add(l.attractionId, -1)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200">
+                      <button
+                        type="button"
+                        aria-label="One fewer"
+                        onClick={() => add(l.attractionId, -1)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200"
+                      >
                         <Minus className="h-4 w-4" />
                       </button>
                       <span className="w-7 text-center text-sm font-bold tabular-nums">{l.quantity}</span>
-                      <button type="button" aria-label="One more" onClick={() => add(l.attractionId)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200">
+                      <button
+                        type="button"
+                        aria-label="One more"
+                        onClick={() => add(l.attractionId)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200"
+                      >
                         <Plus className="h-4 w-4" />
                       </button>
                     </div>
@@ -346,11 +389,17 @@ export default function TicketCounter() {
       )}
 
       {sold && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog" aria-modal="true" aria-labelledby="sold-title">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sold-title"
+        >
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
             <p id="sold-title" className="mt-2 text-center text-lg font-extrabold text-stone-900">
-              {sold.reduce((n, t) => n + t.ticket.quantity, 0)} guest{sold.reduce((n, t) => n + t.ticket.quantity, 0) === 1 ? '' : 's'} ready to go
+              {sold.reduce((n, t) => n + t.ticket.quantity, 0)} guest{sold.reduce((n, t) => n + t.ticket.quantity, 0) === 1 ? '' : 's'}{' '}
+              ready to go
             </p>
             <ul className="mt-4 flex flex-col gap-2">
               {sold.map((t, i) => (
@@ -359,7 +408,9 @@ export default function TicketCounter() {
                     <span className="block truncate font-semibold text-stone-800">
                       Admit {t.ticket.quantity} · {t.attraction?.name ?? 'General admission'}
                     </span>
-                    <span className="font-mono text-xs text-stone-500">{t.offline ? 'Sold offline — staff admit at the gate' : ticketCode(t.ticket)}</span>
+                    <span className="font-mono text-xs text-stone-500">
+                      {t.offline ? 'Sold offline — staff admit at the gate' : ticketCode(t.ticket)}
+                    </span>
                   </span>
                   <span className="font-bold tabular-nums">{money(t.price * t.ticket.quantity)}</span>
                 </li>

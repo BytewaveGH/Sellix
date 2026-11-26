@@ -186,8 +186,7 @@ export const repeatable = (g: OptionGroup) => g.kind === 'addon' && !!g.repeat
 export const countOf = (ids: string[] | undefined, id: string) => (ids ?? []).filter((x) => x === id).length
 
 // Ids of an item's groups charged once per line (for ingredient use).
-export const onceGroupIds = (item: MenuItem | undefined) =>
-  new Set((item?.optionGroups ?? []).filter(chargedOnce).map((g) => g.id))
+export const onceGroupIds = (item: MenuItem | undefined) => new Set((item?.optionGroups ?? []).filter(chargedOnce).map((g) => g.id))
 
 // What a line costs: unitPrice × quantity + onceExtras.
 export const lineAmount = (price: Pick<LinePrice, 'unitPrice' | 'onceExtras'>, quantity: number) =>

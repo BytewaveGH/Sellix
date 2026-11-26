@@ -61,7 +61,8 @@ export const isIos = () =>
 export const isAndroid = () => typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent)
 
 // Phones and tablets (iPads report themselves as Macs, hence the touch check).
-export const isMobileDevice = () => isIos() || isAndroid() || (typeof navigator !== 'undefined' && /mobile|tablet/i.test(navigator.userAgent))
+export const isMobileDevice = () =>
+  isIos() || isAndroid() || (typeof navigator !== 'undefined' && /mobile|tablet/i.test(navigator.userAgent))
 
 export type InstallKind =
   | 'prompt' // one tap: the browser's own install dialog

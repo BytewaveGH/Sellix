@@ -75,13 +75,7 @@ export type ParkDay = {
   guestsBookedToday: number
 }
 
-export const parkDay = (
-  tickets: Ticket[],
-  attractions: Attraction[],
-  bookings: Booking[],
-  now: Date,
-  admissionPrice: number
-): ParkDay => {
+export const parkDay = (tickets: Ticket[], attractions: Attraction[], bookings: Booking[], now: Date, admissionPrice: number): ParkDay => {
   const byId = new Map(attractions.map((a) => [a.id, a]))
   const today = tickets.filter((t) => sameDay(t.createdAt, now))
   const yesterday = new Date(now.getTime() - 86_400_000)

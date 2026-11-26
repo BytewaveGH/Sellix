@@ -49,8 +49,7 @@ export function classifyHost(host: string | null | undefined): HostClassificatio
 
 export const DESKTOP_BUSINESS_META = 'sellix-business'
 
-const validSlug = (value: unknown): string | null =>
-  typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null
+const validSlug = (value: unknown): string | null => (typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null)
 
 // Server side: the desktop's business, or null.
 export const desktopBusiness = (env: Record<string, string | undefined> = process.env): string | null =>

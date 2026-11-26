@@ -28,33 +28,38 @@ const WAREHOUSES = { url: '/warehouses/' }
 // ── Retail ───────────────────────────────────────────────────────────────────
 
 const applyStock = (scope: string, stock: Row[], deletedUnits: Set<number>) =>
-  patchKeptReads(scope, (key, body) => {
-    if (!listsCollection(key, '/products') || (!stock.length && !deletedUnits.size)) return undefined
-    const list = listIn(body)
-    if (!list) return undefined
-    const byProduct = new Map<number, Row[]>()
-    for (const s of stock) byProduct.set(Number(s.productId), [...(byProduct.get(Number(s.productId)) ?? []), s])
-    return withList(
-      body,
-      list.map((p) => {
-        let next: Row = p
-        const units = p.units
-        if (deletedUnits.size && Array.isArray(units)) next = { ...next, units: units.filter((u: Row) => !deletedUnits.has(Number(u.id))) }
-        const changes = byProduct.get(Number(p.id))
-        if (changes) {
-          const stockRows = Array.isArray(p.stock) ? [...(p.stock as Row[])] : []
-          for (const c of changes) {
-            const at = stockRows.findIndex((s) => Number(s.warehouseId) === Number(c.warehouseId))
-            const row = { ...(at >= 0 ? stockRows[at] : {}), warehouseId: c.warehouseId, quantity: c.quantity }
-            if (at >= 0) stockRows[at] = row
-            else stockRows.push(row)
+  patchKeptReads(
+    scope,
+    (key, body) => {
+      if (!listsCollection(key, '/products') || (!stock.length && !deletedUnits.size)) return undefined
+      const list = listIn(body)
+      if (!list) return undefined
+      const byProduct = new Map<number, Row[]>()
+      for (const s of stock) byProduct.set(Number(s.productId), [...(byProduct.get(Number(s.productId)) ?? []), s])
+      return withList(
+        body,
+        list.map((p) => {
+          let next: Row = p
+          const units = p.units
+          if (deletedUnits.size && Array.isArray(units))
+            next = { ...next, units: units.filter((u: Row) => !deletedUnits.has(Number(u.id))) }
+          const changes = byProduct.get(Number(p.id))
+          if (changes) {
+            const stockRows = Array.isArray(p.stock) ? [...(p.stock as Row[])] : []
+            for (const c of changes) {
+              const at = stockRows.findIndex((s) => Number(s.warehouseId) === Number(c.warehouseId))
+              const row = { ...(at >= 0 ? stockRows[at] : {}), warehouseId: c.warehouseId, quantity: c.quantity }
+              if (at >= 0) stockRows[at] = row
+              else stockRows.push(row)
+            }
+            next = { ...next, stock: stockRows, totalQuantity: stockRows.reduce((n, s) => n + (Number(s.quantity) || 0), 0) }
           }
-          next = { ...next, stock: stockRows, totalQuantity: stockRows.reduce((n, s) => n + (Number(s.quantity) || 0), 0) }
-        }
-        return next
-      })
-    )
-  }, (key) => listsCollection(key, '/products'))
+          return next
+        })
+      )
+    },
+    (key) => listsCollection(key, '/products')
+  )
 
 const applyRetailPage = async (scope: string, page: any, first: boolean) => {
   const products = rows(page?.products)
@@ -66,7 +71,8 @@ const applyRetailPage = async (scope: string, page: any, first: boolean) => {
   const warehouses = rows(page?.warehouses)
   const goneWarehouses = ids(deleted.warehouses)
   if (first && !(await getKept(scope, 'retail-cursor'))) await seed(scope, WAREHOUSES, warehouses)
-  if (warehouses.length || goneWarehouses.size) await mergeIntoReads(scope, '/warehouses', warehouses, (r) => goneWarehouses.has(Number(r.id)))
+  if (warehouses.length || goneWarehouses.size)
+    await mergeIntoReads(scope, '/warehouses', warehouses, (r) => goneWarehouses.has(Number(r.id)))
   // Store settings are kept on each device in this app (lib/store/settings), not read from the server.
 }
 
@@ -121,7 +127,9 @@ export const syncEateryMenu = async (scope: string, get: Get): Promise<number> =
         scope,
         path,
         changed,
-        (r) => gone.has(Number(r.id)) || (key === 'restaurants' ? goneRestaurants.has(Number(r.id)) : goneRestaurants.has(Number(r.restaurantId)))
+        (r) =>
+          gone.has(Number(r.id)) ||
+          (key === 'restaurants' ? goneRestaurants.has(Number(r.id)) : goneRestaurants.has(Number(r.restaurantId)))
       )
     }
     if (page?.cursor) await setKept(scope, 'eatery-cursor', page.cursor)

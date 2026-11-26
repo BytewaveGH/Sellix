@@ -204,7 +204,11 @@ export const ItemSheet = ({
                               >
                                 <Minus className="h-4 w-4" />
                               </button>
-                              <span className="w-6 text-center font-extrabold tabular-nums" aria-live="polite" aria-label={`${n} ${c.name}`}>
+                              <span
+                                className="w-6 text-center font-extrabold tabular-nums"
+                                aria-live="polite"
+                                aria-label={`${n} ${c.name}`}
+                              >
                                 {n}
                               </span>
                               <button

@@ -96,21 +96,49 @@ const ResultCard = ({ shown }: { shown: Shown | null }) => {
   const { check } = shown
   const spec =
     check.kind === 'admit'
-      ? { bg: 'from-emerald-500 to-green-600', icon: CheckCircle2, big: `ADMIT ${check.ticket.quantity}`, small: check.attraction?.name ?? 'General admission' }
+      ? {
+          bg: 'from-emerald-500 to-green-600',
+          icon: CheckCircle2,
+          big: `ADMIT ${check.ticket.quantity}`,
+          small: check.attraction?.name ?? 'General admission',
+        }
       : check.kind === 'used'
-        ? { bg: 'from-rose-600 to-red-700', icon: XCircle, big: 'ALREADY USED', small: `${check.attraction?.name ?? 'General admission'} · admit ${check.ticket.quantity}` }
+        ? {
+            bg: 'from-rose-600 to-red-700',
+            icon: XCircle,
+            big: 'ALREADY USED',
+            small: `${check.attraction?.name ?? 'General admission'} · admit ${check.ticket.quantity}`,
+          }
         : check.kind === 'invalid'
-          ? { bg: 'from-rose-600 to-red-700', icon: ShieldAlert, big: 'NOT VALID', small: 'This code isn’t one of your tickets. Check it was typed right.' }
+          ? {
+              bg: 'from-rose-600 to-red-700',
+              icon: ShieldAlert,
+              big: 'NOT VALID',
+              small: 'This code isn’t one of your tickets. Check it was typed right.',
+            }
           : check.kind === 'unknown'
-            ? { bg: 'from-amber-500 to-orange-600', icon: CircleHelp, big: 'NOT FOUND', small: `No ticket T${check.id} here. Sold offline? Check the guest’s receipt.` }
-            : { bg: 'from-amber-500 to-orange-600', icon: CircleHelp, big: 'CAN’T READ', small: 'That doesn’t look like a ticket code. Try again.' }
+            ? {
+                bg: 'from-amber-500 to-orange-600',
+                icon: CircleHelp,
+                big: 'NOT FOUND',
+                small: `No ticket T${check.id} here. Sold offline? Check the guest’s receipt.`,
+              }
+            : {
+                bg: 'from-amber-500 to-orange-600',
+                icon: CircleHelp,
+                big: 'CAN’T READ',
+                small: 'That doesn’t look like a ticket code. Try again.',
+              }
   const ticket: Ticket | undefined = 'ticket' in check ? check.ticket : undefined
   return (
     <div
       key={shown.at.getTime()}
       role="status"
       aria-live="assertive"
-      className={cn('flex h-full min-h-[320px] flex-col items-center justify-center rounded-3xl bg-gradient-to-br p-8 text-center text-white shadow-xl', spec.bg)}
+      className={cn(
+        'flex h-full min-h-[320px] flex-col items-center justify-center rounded-3xl bg-gradient-to-br p-8 text-center text-white shadow-xl',
+        spec.bg
+      )}
       style={{ animation: 'gate-pop 260ms ease-out' }}
     >
       <spec.icon className="h-20 w-20" strokeWidth={2.2} />
@@ -118,7 +146,8 @@ const ResultCard = ({ shown }: { shown: Shown | null }) => {
       <p className="mt-2 max-w-md text-lg font-semibold text-white/90">{spec.small}</p>
       {ticket && (
         <p className="mt-4 rounded-full bg-black/15 px-4 py-1.5 font-mono text-sm">
-          {shown.code} {ticket.buyerName ? `· ${ticket.buyerName}` : ''} · sold {ticket.createdAt ? new Date(ticket.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : ''}
+          {shown.code} {ticket.buyerName ? `· ${ticket.buyerName}` : ''} · sold{' '}
+          {ticket.createdAt ? new Date(ticket.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : ''}
         </p>
       )}
       {shown.error && <p className="mt-3 rounded-xl bg-black/25 px-3 py-2 text-sm">{shown.error}</p>}
@@ -152,7 +181,9 @@ export default function Gate() {
   }, [])
 
   const markRedeemed = (id: number, status: Ticket['status']) =>
-    qc.setQueryData(['tickets'], (old: unknown) => (Array.isArray(old) ? old.map((t: Ticket) => (t.id === id ? { ...t, status } : t)) : old))
+    qc.setQueryData(['tickets'], (old: unknown) =>
+      Array.isArray(old) ? old.map((t: Ticket) => (t.id === id ? { ...t, status } : t)) : old
+    )
 
   const scan = useCallback(
     async (raw: string) => {
@@ -183,7 +214,12 @@ export default function Gate() {
                 adjusts: (key: string) => /^\/tickets(\?|$)/.test(key),
                 adjust: (_key: string, body: unknown) => {
                   const rows = listIn(body)
-                  return rows ? withList(body, rows.map((t) => (Number(t.id) === id ? { ...t, status: 'redeemed' } : t))) : undefined
+                  return rows
+                    ? withList(
+                        body,
+                        rows.map((t) => (Number(t.id) === id ? { ...t, status: 'redeemed' } : t))
+                      )
+                    : undefined
                 },
               },
             } as Parameters<typeof request>[0])
@@ -280,7 +316,11 @@ export default function Gate() {
                   const t = 'ticket' in r.check ? r.check : null
                   return (
                     <li key={r.at.getTime()} className="flex items-center gap-2 text-sm">
-                      {t?.attraction ? <AttractionBadge type={t.attraction.type} size="sm" /> : <span className={cn('h-2.5 w-2.5 rounded-full', ok ? 'bg-emerald-500' : 'bg-rose-500')} />}
+                      {t?.attraction ? (
+                        <AttractionBadge type={t.attraction.type} size="sm" />
+                      ) : (
+                        <span className={cn('h-2.5 w-2.5 rounded-full', ok ? 'bg-emerald-500' : 'bg-rose-500')} />
+                      )}
                       <span className="min-w-0 flex-1 truncate">
                         <span className={cn('font-semibold', ok ? 'text-emerald-700' : 'text-rose-700')}>
                           {ok ? `Admit ${t?.ticket.quantity}` : r.check.kind === 'used' ? 'Used' : 'Refused'}

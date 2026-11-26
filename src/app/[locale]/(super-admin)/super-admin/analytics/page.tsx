@@ -119,8 +119,8 @@ export default function AnalyticsPage() {
         <div role="note" className="mb-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <p>
-            The server doesn’t send usage figures yet (backend §15). Until it does, health below comes from each business’s last activity only,
-            and sales, staff and device columns stay empty.
+            The server doesn’t send usage figures yet (backend §15). Until it does, health below comes from each business’s last activity
+            only, and sales, staff and device columns stay empty.
           </p>
         </div>
       )}
@@ -202,12 +202,17 @@ export default function AnalyticsPage() {
             <Card className="p-5 xl:col-span-2">
               <SectionTitle title="Follow up" hint="Businesses worth a call this week" />
               {alerts.length === 0 ? (
-                <p className="py-6 text-center text-sm text-stone-400">{waiting ? 'Shown once the server sends usage figures.' : 'Nothing needs attention.'}</p>
+                <p className="py-6 text-center text-sm text-stone-400">
+                  {waiting ? 'Shown once the server sends usage figures.' : 'Nothing needs attention.'}
+                </p>
               ) : (
                 <ul className="divide-y divide-stone-100">
                   {alerts.map((a) => (
                     <li key={`${a.kind}-${a.row.tenant.id}`}>
-                      <Link href={`${base}/apps/${a.row.tenant.id}?tab=usage`} className="flex items-center gap-3 py-2.5 hover:bg-stone-50 rounded-lg px-1">
+                      <Link
+                        href={`${base}/apps/${a.row.tenant.id}?tab=usage`}
+                        className="flex items-center gap-3 py-2.5 hover:bg-stone-50 rounded-lg px-1"
+                      >
                         <AppAvatar name={a.row.tenant.name} appType={a.row.tenant.appType} size="sm" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-stone-900">{a.row.tenant.name}</span>
@@ -269,7 +274,10 @@ export default function AnalyticsPage() {
                   aria-label="Health"
                   value={health}
                   onChange={(e) => setHealth(e.target.value as Health | 'all')}
-                  options={[{ value: 'all', label: 'Any health' }, ...counts.map((c) => ({ value: c.health, label: HEALTH[c.health].label }))]}
+                  options={[
+                    { value: 'all', label: 'Any health' },
+                    ...counts.map((c) => ({ value: c.health, label: HEALTH[c.health].label })),
+                  ]}
                   className="w-[150px]"
                 />
                 <Select
@@ -358,8 +366,8 @@ export default function AnalyticsPage() {
             </div>
           </Card>
           <p className="mt-3 text-[11px] text-stone-400 inline-flex items-center gap-1">
-            <Users className="h-3 w-3" /> Usage counts sales, sign-ins and minutes of real use (a tap or key press in that minute). No customer details
-            are collected.
+            <Users className="h-3 w-3" /> Usage counts sales, sign-ins and minutes of real use (a tap or key press in that minute). No
+            customer details are collected.
           </p>
         </>
       )}

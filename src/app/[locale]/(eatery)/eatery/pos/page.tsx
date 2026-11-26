@@ -601,8 +601,8 @@ const PosScreen = ({ o }: { o: OwnerData & { restaurant: Restaurant } }) => {
             )}
             {done.id < 0 ? (
               <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-800">
-                Saved on this till and on its way to the server — other screens get it in a moment, or as soon as the connection
-                is back. Find it later by its receipt number.
+                Saved on this till and on its way to the server — other screens get it in a moment, or as soon as the connection is back.
+                Find it later by its receipt number.
               </p>
             ) : (
               <p className="mt-3 text-xs text-stone-500">

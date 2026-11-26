@@ -20,7 +20,18 @@ import type { ItemStatus, ItemTag, MenuItem, OptionChoice, OptionGroup } from '.
 export const MENU_COLUMNS = ['id', 'name', 'price', 'description', 'options', 'tags', 'status', 'imageUrl'] as const
 type Column = (typeof MENU_COLUMNS)[number]
 
-const TAG_KEYS: ItemTag[] = ['popular', 'new', 'signature', 'spicy', 'vegetarian', 'vegan', 'gluten-free', 'alcoholic', 'non-alcoholic', 'sharing']
+const TAG_KEYS: ItemTag[] = [
+  'popular',
+  'new',
+  'signature',
+  'spicy',
+  'vegetarian',
+  'vegan',
+  'gluten-free',
+  'alcoholic',
+  'non-alcoholic',
+  'sharing',
+]
 // Labels the menu shows, so a file written from the screen reads back.
 const TAG_WORDS: Record<string, ItemTag> = {
   'contains alcohol': 'alcoholic',
@@ -78,13 +89,26 @@ export const itemsToCsv = (items: MenuItem[]) =>
 export const SAMPLE_CSV = toCsv([
   [...MENU_COLUMNS],
   ['', 'Jollof rice', '35', 'With chicken and shito', '', 'popular', '', ''],
-  ['', 'TZ', '0', '', 'Size: Regular 5, Maxi 7 | Proteins (extras, up to 10, once per line, more than one of each): Egg 3, Fish small 20', '', '', ''],
+  [
+    '',
+    'TZ',
+    '0',
+    '',
+    'Size: Regular 5, Maxi 7 | Proteins (extras, up to 10, once per line, more than one of each): Egg 3, Fish small 20',
+    '',
+    '',
+    '',
+  ],
   ['', 'Sobolo', '10', 'Chilled', '', '', '', ''],
 ])
 
 // ── Reading a file ──────────────────────────────────────────────────────────
 
-const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, '')
+const norm = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
 const HEADERS: Record<string, Column> = {
   id: 'id',
   itemid: 'id',
@@ -124,7 +148,10 @@ const unguard = (s: string) => s.trim().replace(/^'(?=[=+\-@])/, '')
 
 // "₵35", "GHS 35.50", "35" → 35. Blank → undefined; not a number → NaN.
 export const parsePrice = (s: string | undefined): number | undefined => {
-  const t = (s ?? '').replace(/GH₵|GHS|GHC|₵|cedis?/gi, '').replace(/,/g, '').trim()
+  const t = (s ?? '')
+    .replace(/GH₵|GHS|GHC|₵|cedis?/gi, '')
+    .replace(/,/g, '')
+    .trim()
   if (!t) return undefined
   const n = Number(t.replace(/^−/, '-'))
   return Number.isFinite(n) ? n : NaN
@@ -150,7 +177,10 @@ export const parseOptions = (
   newId: (prefix: string) => string
 ): { groups: OptionGroup[]; error?: string } => {
   const groups: OptionGroup[] = []
-  for (const part of text.split(/\s*\|\s*|\r?\n/).map((p) => p.trim()).filter(Boolean)) {
+  for (const part of text
+    .split(/\s*\|\s*|\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)) {
     const m = /^(.+?)(?:\s*\(([^)]*)\))?\s*:\s*(.*)$/.exec(part)
     if (!m) return { groups, error: `“${part}”: write it as “Group: choice price, choice price”` }
     const name = m[1].trim()
@@ -277,7 +307,8 @@ export const planMenuImport = (
   const { rows, error } = readMenuFile(text)
   if (error) return { rows: [], error }
   let seq = 0
-  const newId = ctx.newId ?? ((p: string) => `${p}${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 5)}`)
+  const newId =
+    ctx.newId ?? ((p: string) => `${p}${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 5)}`)
   const seen = new Set<string>()
   let position = ctx.items.length
   const out: PlannedRow[] = []
@@ -367,4 +398,9 @@ export const planMenuImport = (
 }
 
 export const fileNameFor = (restaurant: string, section: string) =>
-  `${`${restaurant}-${section}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'menu'}.csv`
+  `${
+    `${restaurant}-${section}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'menu'
+  }.csv`

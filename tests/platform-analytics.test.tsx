@@ -73,16 +73,22 @@ describe('health', () => {
   })
 
   it('a few days of use is steady; little use or a big drop is at risk', () => {
-    expect(engagement(usage(1, { activeDays: 12, activeStaff: 1, activeMinutes: 300, lastActivityAt: ago(2) }), 30, NOW).health).toBe('steady')
+    expect(engagement(usage(1, { activeDays: 12, activeStaff: 1, activeMinutes: 300, lastActivityAt: ago(2) }), 30, NOW).health).toBe(
+      'steady'
+    )
     const dropping = engagement(usage(1, { sales: 100, previous: { revenue: 10_000, sales: 380, activeDays: 25 } }), 30, NOW)
     expect(dropping.health).not.toBe('thriving')
     expect(dropping.reasons).toContain('Sales down 74%')
-    expect(engagement(usage(1, { activeDays: 3, activeStaff: 1, activeMinutes: 20, lastActivityAt: ago(6) }), 30, NOW).health).toBe('at-risk')
+    expect(engagement(usage(1, { activeDays: 3, activeStaff: 1, activeMinutes: 20, lastActivityAt: ago(6) }), 30, NOW).health).toBe(
+      'at-risk'
+    )
   })
 
   it('nothing for 14 days is dormant; a new business is getting started', () => {
     expect(engagement(usage(1, { lastActivityAt: ago(20), activeDays: 2 }), 30, NOW).health).toBe('dormant')
-    expect(engagement(usage(1, { lastActivityAt: null, activeDays: 0, activeStaff: 0, sales: 0, activeMinutes: 0 }), 30, NOW, ago(3)).health).toBe('new')
+    expect(
+      engagement(usage(1, { lastActivityAt: null, activeDays: 0, activeStaff: 0, sales: 0, activeMinutes: 0 }), 30, NOW, ago(3)).health
+    ).toBe('new')
     expect(healthFromLastActivity(ago(30), NOW)).toBe('dormant')
     expect(healthFromLastActivity(ago(2), NOW)).toBe('steady')
   })
@@ -99,7 +105,14 @@ describe('health', () => {
       [
         usage(1, { stuckDevices: 1 }),
         usage(2, { lastActivityAt: ago(20), activeDays: 1 }),
-        usage(3, { activeDays: 1, activeStaff: 0, activeMinutes: 5, lastActivityAt: ago(9), sales: 3, previous: { revenue: 0, sales: 0, activeDays: 0 } }),
+        usage(3, {
+          activeDays: 1,
+          activeStaff: 0,
+          activeMinutes: 5,
+          lastActivityAt: ago(9),
+          sales: 3,
+          previous: { revenue: 0, sales: 0, activeDays: 0 },
+        }),
         usage(4, { sales: 100 }),
       ],
       30,
@@ -122,7 +135,11 @@ describe('health', () => {
   })
 
   it('fills missing days with zeros and exports CSV', () => {
-    const days = fillDays([{ date: '2026-11-25', revenue: 50, sales: 2, signIns: 1, activeStaff: 1, activeMinutes: 30, offlineSales: 0 }], NOW, 3)
+    const days = fillDays(
+      [{ date: '2026-11-25', revenue: 50, sales: 2, signIns: 1, activeStaff: 1, activeMinutes: 30, offlineSales: 0 }],
+      NOW,
+      3
+    )
     expect(days.map((d) => [d.date, d.sales])).toEqual([
       ['2026-11-24', 0],
       ['2026-11-25', 2],
@@ -189,9 +206,14 @@ describe('usage tracker', () => {
 describe('desktop app is core', () => {
   it('is listed on every plan and the download link must be https', () => {
     expect(CORE_FEATURES.map((f) => f.key)).toEqual(['core.desktop', 'core.offline'])
-    const ok = parseCatalog({ ...DEFAULT_CATALOG, settings: { ...DEFAULT_CATALOG.settings, desktopDownloadUrl: 'https://x.com/setup.exe' } })
+    const ok = parseCatalog({
+      ...DEFAULT_CATALOG,
+      settings: { ...DEFAULT_CATALOG.settings, desktopDownloadUrl: 'https://x.com/setup.exe' },
+    })
     expect(ok.settings.desktopDownloadUrl).toBe('https://x.com/setup.exe')
-    expect(() => parseCatalog({ ...DEFAULT_CATALOG, settings: { ...DEFAULT_CATALOG.settings, desktopDownloadUrl: 'http://x.com' } })).toThrow(/https/)
+    expect(() =>
+      parseCatalog({ ...DEFAULT_CATALOG, settings: { ...DEFAULT_CATALOG.settings, desktopDownloadUrl: 'http://x.com' } })
+    ).toThrow(/https/)
     // Older saved catalogs without the field still load.
     const { desktopDownloadUrl: _, ...old } = DEFAULT_CATALOG.settings
     expect(parseCatalog({ ...DEFAULT_CATALOG, settings: old }).settings.desktopDownloadUrl).toBe('')
@@ -243,7 +265,11 @@ describe('Usage & engagement page', () => {
       to: NOW.toISOString(),
       days: 30,
       updatedAt: NOW.toISOString(),
-      tenants: [usage(1), usage(2, { lastActivityAt: ago(20), activeDays: 1, revenue: 100, sales: 4, desktopDevices: 0 }), usage(3, { stuckDevices: 1, revenue: 5000 })],
+      tenants: [
+        usage(1),
+        usage(2, { lastActivityAt: ago(20), activeDays: 1, revenue: 100, sales: 4, desktopDevices: 0 }),
+        usage(3, { stuckDevices: 1, revenue: 5000 }),
+      ],
     }
     nav.params = { locale: 'en' }
     withQuery(<AnalyticsPage />)
@@ -277,7 +303,9 @@ describe('a business’s Usage tab', () => {
       updatedAt: NOW.toISOString(),
       summary: usage(3, { stuckDevices: 1 }),
       daily: [{ date: '2026-11-25', revenue: 900, sales: 30, signIns: 3, activeStaff: 2, activeMinutes: 120, offlineSales: 4 }],
-      staff: [{ id: 7, name: 'Esi Mensah', role: 'cashier', lastSeenAt: ago(0.2), signIns: 20, sales: 300, revenue: 9000, activeMinutes: 1500 }],
+      staff: [
+        { id: 7, name: 'Esi Mensah', role: 'cashier', lastSeenAt: ago(0.2), signIns: 20, sales: 300, revenue: 9000, activeMinutes: 1500 },
+      ],
       devices: [
         { id: 'till-a', kind: 'desktop', appVersion: '0.1.0', lastSeenAt: ago(0.1), lastSyncAt: ago(3), pending: 12 },
         { id: 'till-b', kind: 'desktop', appVersion: '0.2.0', lastSeenAt: ago(0.1), lastSyncAt: ago(0.1), pending: 0 },

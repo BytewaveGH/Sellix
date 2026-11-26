@@ -68,7 +68,11 @@ const env = {
 }
 
 // What the build will use, for the person running it.
-const webEnv = { ...parseEnv(path.join(root, '.env')), ...parseEnv(path.join(root, '.env.production')), ...parseEnv(path.join(root, '.env.local')) }
+const webEnv = {
+  ...parseEnv(path.join(root, '.env')),
+  ...parseEnv(path.join(root, '.env.production')),
+  ...parseEnv(path.join(root, '.env.local')),
+}
 const shown = (key) => env[key] ?? webEnv[key] ?? '(not set)'
 console.log('Desktop build settings:')
 for (const key of ['NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_EATERY_DATA_SOURCE', 'NEXT_PUBLIC_REAL_ESTATE_DATA_SOURCE']) {
@@ -100,10 +104,7 @@ fs.cpSync(path.join(root, 'public'), path.join(stage, 'public'), { recursive: tr
 // Electron starts this instead of server.js. The middleware hands requests back
 // to the server at "localhost", which Node would look up as ::1 (IPv6) first,
 // but the server only listens on 127.0.0.1 so it isn't reachable from the network.
-fs.writeFileSync(
-  path.join(stage, 'desktop-entry.js'),
-  "require('node:dns').setDefaultResultOrder('ipv4first')\nrequire('./server.js')\n"
-)
+fs.writeFileSync(path.join(stage, 'desktop-entry.js'), "require('node:dns').setDefaultResultOrder('ipv4first')\nrequire('./server.js')\n")
 
 // For Electron's own calls (checking a business code in setup): the API this build talks to.
 fs.writeFileSync(

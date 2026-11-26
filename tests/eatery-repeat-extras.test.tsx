@@ -57,7 +57,12 @@ const threeEggs = { protein: ['egg', 'egg', 'egg'] }
 describe('pricing', () => {
   it('three eggs cost three times the egg', () => {
     expect(linePrice(waakye(), threeEggs, undefined, [], now).unitPrice).toBe(10 + 9)
-    const order = priceOrder(bundleWith(waakye()), [{ itemId: 1, quantity: 1, choices: { protein: ['egg', 'egg', 'egg', 'fish'] } }], 'pickup', now)
+    const order = priceOrder(
+      bundleWith(waakye()),
+      [{ itemId: 1, quantity: 1, choices: { protein: ['egg', 'egg', 'egg', 'fish'] } }],
+      'pickup',
+      now
+    )
     expect(order.problems).toEqual([])
     expect(order.lines[0]).toMatchObject({ lineTotal: 39, summary: '+ Egg × 3, Fish small' })
   })
@@ -80,9 +85,13 @@ describe('pricing', () => {
   })
 
   it('uses the egg’s ingredients each time', () => {
-    const recipes = new Map<number, Recipe>([[1, { itemId: 1, ingredients: [], choices: { egg: [{ ingredientId: 7, quantity: 1 }] } } as any]])
+    const recipes = new Map<number, Recipe>([
+      [1, { itemId: 1, ingredients: [], choices: { egg: [{ ingredientId: 7, quantity: 1 }] } } as any],
+    ])
     expect(lineUsage({ itemId: 1, quantity: 2, choices: threeEggs }, recipes).get(7)).toBe(6)
-    expect(lineUsage({ itemId: 1, quantity: 2, choices: threeEggs }, recipes, onceGroupIds(waakye(proteins({ chargeOnce: true })))).get(7)).toBe(3)
+    expect(
+      lineUsage({ itemId: 1, quantity: 2, choices: threeEggs }, recipes, onceGroupIds(waakye(proteins({ chargeOnce: true })))).get(7)
+    ).toBe(3)
   })
 
   it('summary leaves out the count for a single one', () => {

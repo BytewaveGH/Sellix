@@ -1,16 +1,7 @@
 import { vi } from 'vitest'
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { memoryStore, setOfflineStore } from '@/lib/offline/store'
-import {
-  cannotQueue,
-  listIn,
-  pathOf,
-  readKey,
-  replaceId,
-  tempIdsIn,
-  withList,
-  writeShape,
-} from '@/lib/offline/rules'
+import { cannotQueue, listIn, pathOf, readKey, replaceId, tempIdsIn, withList, writeShape } from '@/lib/offline/rules'
 import { cachedRead, listOps, discardOp, retryOp, syncOutbox, type Op } from '@/lib/offline/engine'
 import { offlineKind, withOffline } from '@/lib/offline/adapter'
 import { withoutTokens } from '@/lib/session-offline'
@@ -20,7 +11,8 @@ import { saleToOrder } from '@/lib/store/orders'
 
 const SCOPE = 'acme:1'
 const netErr = () => Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK', request: {} })
-const httpErr = (status: number, error: string) => Object.assign(new Error(error), { isAxiosError: true, response: { status, data: { error } } })
+const httpErr = (status: number, error: string) =>
+  Object.assign(new Error(error), { isAxiosError: true, response: { status, data: { error } } })
 
 const setOnline = (on: boolean) => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(on)
 
@@ -53,7 +45,9 @@ describe('what a request means offline', () => {
 
   it('reads and replaces lists in every answer shape, keeping counts right', () => {
     expect(listIn({ data: { data: [{ id: 1 }], count: 1 } })).toEqual([{ id: 1 }])
-    expect(withList({ data: { data: [{ id: 1 }], count: 1 } }, [{ id: 1 }, { id: 2 }])).toEqual({ data: { data: [{ id: 1 }, { id: 2 }], count: 2 } })
+    expect(withList({ data: { data: [{ id: 1 }], count: 1 } }, [{ id: 1 }, { id: 2 }])).toEqual({
+      data: { data: [{ id: 1 }, { id: 2 }], count: 2 },
+    })
     expect(withList({ data: [{ id: 1 }] }, [])).toEqual({ data: [] })
   })
 })
@@ -87,7 +81,13 @@ describe('working offline through the API client', () => {
   }
   // What sendQueued does, against the fake server.
   const send = (op: Op) =>
-    base({ method: op.method, url: op.url, params: op.params, data: JSON.stringify(op.data ?? {}), headers: {} } as InternalAxiosRequestConfig)
+    base({
+      method: op.method,
+      url: op.url,
+      params: op.params,
+      data: JSON.stringify(op.data ?? {}),
+      headers: {},
+    } as InternalAxiosRequestConfig)
   const adapter = withOffline(base, send)
   const call = (method: string, url: string, data?: unknown, extra: Record<string, unknown> = {}) =>
     adapter({ method, url, data, headers: {}, _scope: SCOPE, ...extra } as unknown as InternalAxiosRequestConfig)
@@ -120,7 +120,12 @@ describe('working offline through the API client', () => {
     server.down = true
     setOnline(false)
 
-    const created = await call('post', '/eatery/orders/counter', { table: '4' }, { offline: { appendTo: '/eatery/orders', result: () => ({ total: 50 }) } })
+    const created = await call(
+      'post',
+      '/eatery/orders/counter',
+      { table: '4' },
+      { offline: { appendTo: '/eatery/orders', result: () => ({ total: 50 }) } }
+    )
     expect(offlineKind(created)).toBe('queued')
     const tempId = created.data.data.id as number
     expect(tempId).toBeLessThan(0)
@@ -223,7 +228,18 @@ describe('the till offline', () => {
     const body = {
       data: {
         data: [
-          { id: 11, totalQuantity: 60, units: [{ id: 101, baseQuantity: 1 }, { id: 102, baseQuantity: 12 }], stock: [{ warehouseId: 1, quantity: 60 }, { warehouseId: 2, quantity: 5 }] },
+          {
+            id: 11,
+            totalQuantity: 60,
+            units: [
+              { id: 101, baseQuantity: 1 },
+              { id: 102, baseQuantity: 12 },
+            ],
+            stock: [
+              { warehouseId: 1, quantity: 60 },
+              { warehouseId: 2, quantity: 5 },
+            ],
+          },
           { id: 12, totalQuantity: 3, units: [{ id: 201, baseQuantity: 1 }] },
         ],
         count: 2,
@@ -236,7 +252,13 @@ describe('the till offline', () => {
         { productUnitId: 102, quantity: 1, pricingType: 'retail' },
       ],
     }) as typeof body
-    expect(next.data.data[0]).toMatchObject({ totalQuantity: 46, stock: [{ warehouseId: 1, quantity: 46 }, { warehouseId: 2, quantity: 5 }] })
+    expect(next.data.data[0]).toMatchObject({
+      totalQuantity: 46,
+      stock: [
+        { warehouseId: 1, quantity: 46 },
+        { warehouseId: 2, quantity: 5 },
+      ],
+    })
     expect(next.data.data[1].totalQuantity).toBe(3)
   })
 
@@ -303,7 +325,10 @@ describe('a poor connection', () => {
     let version = 1
     const base: AxiosAdapter = (config) =>
       new Promise((resolve) =>
-        setTimeout(() => resolve({ data: { data: [{ id: 1, v: version }] }, status: 200, statusText: 'OK', headers: {}, config, request: {} }), delay)
+        setTimeout(
+          () => resolve({ data: { data: [{ id: 1, v: version }] }, status: 200, statusText: 'OK', headers: {}, config, request: {} }),
+          delay
+        )
       )
     const adapter = withOffline(base, async () => ({ data: {} }), 50)
     const get = () => adapter({ method: 'get', url: '/products/', headers: {}, _scope: SCOPE } as unknown as InternalAxiosRequestConfig)

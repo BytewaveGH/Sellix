@@ -142,7 +142,10 @@ export const PlanDrawer = ({ tenant, sub, catalog, open, onOpenChange, onNext }:
     ? { type: 'assign', planId, cycle: planCycle, trialDays: trial && !usage ? days : 0 }
     : { type: 'change-plan', planId, cycle: planCycle }
   const unchanged = !restart && planId === sub?.planId && planCycle === sub?.cycle
-  const result = useMemo(() => (plan ? preview(sub, tenant.id, action, catalog) : null), [sub, tenant.id, catalog, planId, planCycle, trial, days, restart]) // eslint-disable-line react-hooks/exhaustive-deps
+  const result = useMemo(
+    () => (plan ? preview(sub, tenant.id, action, catalog) : null),
+    [sub, tenant.id, catalog, planId, planCycle, trial, days, restart]
+  ) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = () =>
     run(

@@ -44,4 +44,3 @@ export const Confetti = ({ burst }: { burst: number }) => {
     </div>
   )
 }
-

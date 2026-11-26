@@ -72,7 +72,14 @@ const TrendChart = ({ p, fmt }: { p: Patterns; fmt: (n: number) => string }) => 
       <svg width={w} height={H} role="img" aria-label={`Daily ${p.metric} with 7-day average`} className="block">
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={w - pad.r} y1={y(nice * t)} y2={y(nice * t)} className="stroke-stone-200" strokeDasharray={t ? '3 4' : undefined} />
+            <line
+              x1={pad.l}
+              x2={w - pad.r}
+              y1={y(nice * t)}
+              y2={y(nice * t)}
+              className="stroke-stone-200"
+              strokeDasharray={t ? '3 4' : undefined}
+            />
             <text x={pad.l - 8} y={y(nice * t) + 4} textAnchor="end" className="fill-stone-400 text-[10px] tabular-nums">
               {fmt(nice * t)}
             </text>

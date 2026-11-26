@@ -149,7 +149,8 @@ export const MenuImport = ({
               <b>name</b> (needed), <b>price</b>, description, options, tags, status, imageUrl. Export a section to see a filled-in file.
             </li>
             <li>
-              <b>options</b>: <code>Size: Regular 5, Maxi 7 | Proteins (extras, up to 10, once per line, more than one of each): Egg 3, Fish 20</code>
+              <b>options</b>:{' '}
+              <code>Size: Regular 5, Maxi 7 | Proteins (extras, up to 10, once per line, more than one of each): Egg 3, Fish 20</code>
             </li>
             <li>A group is pick-one unless its brackets say “extras”. With price 0, the pick-one choices carry the full price.</li>
             <li>Empty cells leave an existing item as it is. Combos keep their combo choices.</li>
@@ -171,7 +172,9 @@ export const MenuImport = ({
             <ul className="mt-2 divide-y divide-stone-100 rounded-xl border border-stone-200" aria-label="Import preview">
               {rows.map((r) => (
                 <li key={`${r.line}-${r.name}`} className="flex items-center gap-3 px-3 py-2 text-sm">
-                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', BADGE[r.action].className)}>{BADGE[r.action].label}</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', BADGE[r.action].className)}>
+                    {BADGE[r.action].label}
+                  </span>
                   <span className="min-w-0 flex-1 truncate font-semibold text-stone-800">{r.name}</span>
                   <span className="truncate text-xs text-stone-500">
                     {r.action === 'create'

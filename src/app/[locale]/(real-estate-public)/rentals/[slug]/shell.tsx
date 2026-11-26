@@ -16,7 +16,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const site = data?.site
   usePublicApp(
     site && data
-      ? { path: `/${params?.locale ?? 'en'}/rentals/${encodeURIComponent(data.slug)}`, bg: /^#[0-9a-f]{6}$/i.test(site.accent) ? site.accent : '#0865AC', fg: '#FFFFFF', logo: site.logoUrl }
+      ? {
+          path: `/${params?.locale ?? 'en'}/rentals/${encodeURIComponent(data.slug)}`,
+          bg: /^#[0-9a-f]{6}$/i.test(site.accent) ? site.accent : '#0865AC',
+          fg: '#FFFFFF',
+          logo: site.logoUrl,
+        }
       : null
   )
   return <div style={accentStyle(data?.site.accent ?? '#0865AC')}>{children}</div>

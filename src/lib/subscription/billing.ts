@@ -164,7 +164,8 @@ export const applyAction = (
       const plan = findPlan(catalog, action.planId, { allowArchived: action.planId === sub.planId })
       const nextCycle = plan.usage ? 'monthly' : (action.cycle ?? sub.cycle)
       if (plan.id === sub.planId && nextCycle === sub.cycle) throw new BillingError(409, `Already on ${plan.name} (${nextCycle})`)
-      if (plan.usage && !isUsagePlan(currentPlan)) return log(startUsage(sub, plan), `Plan changed to ${plan.name} — first bill on ${day(addMonths(now, 1))}`)
+      if (plan.usage && !isUsagePlan(currentPlan))
+        return log(startUsage(sub, plan), `Plan changed to ${plan.name} — first bill on ${day(addMonths(now, 1))}`)
       return log({ ...sub, planId: plan.id, cycle: nextCycle, request: undefined }, `Plan changed to ${plan.name} (${nextCycle})`)
     }
 

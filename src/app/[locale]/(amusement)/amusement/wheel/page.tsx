@@ -48,7 +48,12 @@ const WheelSvg = ({ prizes, rotation }: { prizes: Prize[]; rotation: number }) =
           const mid = (start + end) / 2
           return (
             <g key={prize.id}>
-              <path d={`M${C} ${C} L${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`} fill={prize.color} stroke="#2E1065" strokeWidth="3" />
+              <path
+                d={`M${C} ${C} L${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`}
+                fill={prize.color}
+                stroke="#2E1065"
+                strokeWidth="3"
+              />
               <text
                 transform={`rotate(${mid - 90} ${C} ${C})`}
                 x={C + R - 18}
@@ -73,7 +78,17 @@ const WheelSvg = ({ prizes, rotation }: { prizes: Prize[]; rotation: number }) =
   )
 }
 
-const PrizeEditor = ({ open, onClose, prizes, onSave }: { open: boolean; onClose: () => void; prizes: Prize[]; onSave: (p: Prize[]) => void }) => {
+const PrizeEditor = ({
+  open,
+  onClose,
+  prizes,
+  onSave,
+}: {
+  open: boolean
+  onClose: () => void
+  prizes: Prize[]
+  onSave: (p: Prize[]) => void
+}) => {
   const [draft, setDraft] = useState(prizes)
   useEffect(() => {
     if (open) setDraft(prizes)
@@ -108,7 +123,12 @@ const PrizeEditor = ({ open, onClose, prizes, onSave }: { open: boolean; onClose
         {draft.map((p, i) => (
           <li key={p.id} className="rounded-2xl border border-stone-200 p-3">
             <div className="flex items-center gap-2">
-              <Input value={p.label} onChange={(e) => set(i, { label: e.target.value })} placeholder="Prize" aria-label={`Prize ${i + 1}`} />
+              <Input
+                value={p.label}
+                onChange={(e) => set(i, { label: e.target.value })}
+                placeholder="Prize"
+                aria-label={`Prize ${i + 1}`}
+              />
               <button
                 type="button"
                 aria-label={`Remove ${p.label || 'prize'}`}
@@ -136,11 +156,23 @@ const PrizeEditor = ({ open, onClose, prizes, onSave }: { open: boolean; onClose
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="text-xs text-stone-500">Chance</span>
-                <button type="button" aria-label="Less likely" onClick={() => set(i, { weight: Math.max(0, p.weight - 1) })} className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100">
+                <button
+                  type="button"
+                  aria-label="Less likely"
+                  onClick={() => set(i, { weight: Math.max(0, p.weight - 1) })}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100"
+                >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
-                <span className="w-16 text-center text-sm font-bold tabular-nums">{Math.round((Math.max(0, p.weight) / total) * 100)}%</span>
-                <button type="button" aria-label="More likely" onClick={() => set(i, { weight: Math.min(20, p.weight + 1) })} className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100">
+                <span className="w-16 text-center text-sm font-bold tabular-nums">
+                  {Math.round((Math.max(0, p.weight) / total) * 100)}%
+                </span>
+                <button
+                  type="button"
+                  aria-label="More likely"
+                  onClick={() => set(i, { weight: Math.min(20, p.weight + 1) })}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100"
+                >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -154,7 +186,10 @@ const PrizeEditor = ({ open, onClose, prizes, onSave }: { open: boolean; onClose
           icon={Plus}
           className="mt-3 w-full"
           onClick={() =>
-            setDraft((d) => [...d, { id: `p-${Date.now().toString(36)}`, label: '', color: PRIZE_COLORS[d.length % PRIZE_COLORS.length], weight: 1 }])
+            setDraft((d) => [
+              ...d,
+              { id: `p-${Date.now().toString(36)}`, label: '', color: PRIZE_COLORS[d.length % PRIZE_COLORS.length], weight: 1 },
+            ])
           }
         >
           Add a prize
@@ -260,7 +295,9 @@ export default function PrizeWheel() {
           <div className="relative mt-6 h-20 text-center text-white" aria-live="polite">
             {won ? (
               <div style={{ animation: 'win-pop 400ms cubic-bezier(.2,1.6,.4,1)' }}>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-300">{/again/i.test(won.label) ? 'So close!' : 'Winner!'}</p>
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-300">
+                  {/again/i.test(won.label) ? 'So close!' : 'Winner!'}
+                </p>
                 <p className="text-4xl font-black tracking-tight sm:text-5xl">{won.label}</p>
               </div>
             ) : (
@@ -295,7 +332,9 @@ export default function PrizeWheel() {
                   <li key={h.at.getTime()} className="flex items-center gap-2 text-sm">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: h.prize.color }} aria-hidden />
                     <span className="flex-1 truncate font-semibold text-stone-700">{h.prize.label}</span>
-                    <span className="text-xs tabular-nums text-stone-400">{h.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
+                    <span className="text-xs tabular-nums text-stone-400">
+                      {h.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -52,7 +52,8 @@ export const useUsageBook = (days: number) => {
           state: r.access.state,
           planName: r.access.plan?.name,
           monthly: r.sub && r.access.plan ? monthlyEquivalent(r.access.plan, r.sub.cycle) : 0,
-          trialEndsInDays: r.access.state === 'trialing' && r.access.endsAt ? Math.ceil((r.access.endsAt.getTime() - now.getTime()) / DAY) : null,
+          trialEndsInDays:
+            r.access.state === 'trialing' && r.access.endsAt ? Math.ceil((r.access.endsAt.getTime() - now.getTime()) / DAY) : null,
         },
       ])
     )

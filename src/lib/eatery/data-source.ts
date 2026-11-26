@@ -60,11 +60,7 @@ export interface EaterySource {
   // accepted straight away, so its ingredients leave stock at once.
   // `offline`: the order as the till prices it, kept and shown at once if
   // the connection is down (API only; lib/offline sends it later).
-  createCounterOrder(
-    restaurantId: number,
-    input: CounterOrderInput,
-    offline?: OfflineCounterOrder
-  ): Promise<Order & { accessKey: string }>
+  createCounterOrder(restaurantId: number, input: CounterOrderInput, offline?: OfflineCounterOrder): Promise<Order & { accessKey: string }>
   // Stores a prepared logo/cover image (images.ts) and returns its URL.
   uploadImage(restaurantId: number, image: Blob, kind: ImageKind): Promise<string>
   // Local only: hand the example restaurants shown in the directory to this business.
@@ -160,7 +156,15 @@ export const createApiSource = (
   // The menu is read from this device whenever it has it (kept current in the
   // background, lib/offline/catalogue.ts): the counter never waits for it.
   list: async (r) =>
-    asList(unwrap(await owner(MENU_RESOURCES.has(r) ? ({ ...EateryServices.List(r), offline: { cacheFirst: true } } as AxiosRequestConfig) : EateryServices.List(r)))),
+    asList(
+      unwrap(
+        await owner(
+          MENU_RESOURCES.has(r)
+            ? ({ ...EateryServices.List(r), offline: { cacheFirst: true } } as AxiosRequestConfig)
+            : EateryServices.List(r)
+        )
+      )
+    ),
   create: async (r, body) => unwrap(await owner(EateryServices.Create(r, body))),
   update: async (r, id, body) => unwrap(await owner(EateryServices.Update(r, id, body))),
   remove: async (r, id) => {

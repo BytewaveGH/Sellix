@@ -85,7 +85,11 @@ describe('sending till sales in batches', () => {
     expect(sent[0].headers).toEqual({ 'X-Device-Id': 'till-1' })
     const left = await listOps(SCOPE)
     expect(left).toHaveLength(1)
-    expect(left[0]).toMatchObject({ status: 'failed', code: 'product_unit_deleted', error: '“Milo 400g (Tin)” is no longer in the catalogue.' })
+    expect(left[0]).toMatchObject({
+      status: 'failed',
+      code: 'product_unit_deleted',
+      error: '“Milo 400g (Tin)” is no longer in the catalogue.',
+    })
   })
 
   it('keeps the batch for later on no answer, too many requests or a server error', async () => {
@@ -114,7 +118,9 @@ describe('sending till sales in batches', () => {
     await syncOutbox(SCOPE, async (req) => {
       const sales = (req.data as { sales: { clientId: string }[] }).sales
       sizes.push(sales.length)
-      return { data: { data: { results: sales.map((s, i) => ({ clientId: s.clientId, status: 'created', id: 1000 * sizes.length + i + 1 })) } } }
+      return {
+        data: { data: { results: sales.map((s, i) => ({ clientId: s.clientId, status: 'created', id: 1000 * sizes.length + i + 1 })) } },
+      }
     })
     expect(sizes).toEqual([200, 5])
     expect(await listOps(SCOPE)).toEqual([])
@@ -123,7 +129,9 @@ describe('sending till sales in batches', () => {
 
 describe('what staff read when a sale is refused', () => {
   it('names deleted items from the till and explains clock problems', () => {
-    expect(refusalMessage('menu_item_deleted', 'menu item 12 no longer exists', { '12': 'Jollof' })).toBe('“Jollof” is no longer in the menu.')
+    expect(refusalMessage('menu_item_deleted', 'menu item 12 no longer exists', { '12': 'Jollof' })).toBe(
+      '“Jollof” is no longer in the menu.'
+    )
     expect(refusalMessage('product_unit_deleted', 'product unit 5 no longer exists')).toBe('product unit 5 no longer exists')
     expect(refusalMessage('bad_sale_time', 'soldAt is in the future')).toMatch(/check this PC’s date and time/)
     expect(refusalMessage(undefined, 'Nope')).toBe('Nope')
@@ -148,8 +156,15 @@ describe('a retail sale’s till fields', () => {
       receiptNo: 'AB12-0001',
       at: new Date('2026-11-11T10:02:31Z'),
     })
-    expect(payload).toMatchObject({ clientId: 'cid-0001', receiptNo: 'AB12-0001', soldAt: '2026-11-11T10:02:31.000Z', deviceId: expect.stringMatching(/^till-/) })
-    const request = vi.fn().mockResolvedValue({ data: { data: { id: 1, clientId: 'cid-0001', receiptNo: 'AB12-0001', totalAmount: 96, items: [] } } })
+    expect(payload).toMatchObject({
+      clientId: 'cid-0001',
+      receiptNo: 'AB12-0001',
+      soldAt: '2026-11-11T10:02:31.000Z',
+      deviceId: expect.stringMatching(/^till-/),
+    })
+    const request = vi
+      .fn()
+      .mockResolvedValue({ data: { data: { id: 1, clientId: 'cid-0001', receiptNo: 'AB12-0001', totalAmount: 96, items: [] } } })
     const result = await submitSale(request, payload, { preview })
     expect(request.mock.calls[0][0].data.items[0].unitPrice).toBeUndefined()
     // Kept offline, it's sent with what the customer paid.
@@ -160,9 +175,13 @@ describe('a retail sale’s till fields', () => {
 
   it('names a deleted product from the cart when a live sale is refused', async () => {
     const request = vi.fn().mockRejectedValue(httpErr(422, { error: 'product unit 41 no longer exists', code: 'product_unit_deleted' }))
-    const result = await submitSale(request, buildSalePayload(cart, { paymentType: 'cash', warehouseId: 3, customerType: 'retail', user: null }), {
-      preview,
-    })
+    const result = await submitSale(
+      request,
+      buildSalePayload(cart, { paymentType: 'cash', warehouseId: 3, customerType: 'retail', user: null }),
+      {
+        preview,
+      }
+    )
     expect(result).toEqual({ ok: false, kind: 'invalid', message: '“Milo 400g (Tin)” is no longer in the catalogue.' })
   })
 
@@ -224,7 +243,9 @@ describe('keeping the catalogue on the PC current', () => {
           cursor: 'c2',
           hasMore: true,
           nextAfter: 1,
-          products: [{ id: 1, name: 'Milo 400g', units: [{ id: 10 }, { id: 11 }], stock: [{ warehouseId: 3, quantity: 5 }], totalQuantity: 5 }],
+          products: [
+            { id: 1, name: 'Milo 400g', units: [{ id: 10 }, { id: 11 }], stock: [{ warehouseId: 3, quantity: 5 }], totalQuantity: 5 },
+          ],
           stock: [
             { productId: 1, warehouseId: 3, quantity: 9 },
             { productId: 1, warehouseId: 4, quantity: 1 },
@@ -255,7 +276,10 @@ describe('keeping the catalogue on the PC current', () => {
 
   it('starts over when the server no longer accepts the saved cursor', async () => {
     await setKept(SCOPE, 'retail-cursor', 'stale')
-    const get = vi.fn().mockRejectedValueOnce(httpErr(400)).mockResolvedValueOnce(page({ cursor: 'fresh' }))
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(httpErr(400))
+      .mockResolvedValueOnce(page({ cursor: 'fresh' }))
     await syncRetailCatalogue(SCOPE, get)
     expect(get.mock.calls.map((c) => c[1])).toEqual([{ since: 'stale' }, {}])
     expect(await getKept(SCOPE, 'retail-cursor')).toBe('fresh')
@@ -314,7 +338,11 @@ describe('an eatery counter order kept offline', () => {
       fulfilment: { type: 'pickup' as const },
       payment: { method: 'cash' as const, paid: true },
     }
-    const body = offlineOrderBody(menu, { ...input, clientId: '6f1c2a9e-7a0b-4c55-9a43-3e2f7c1d8b10', receiptNo: 'AB12-0007', soldAt: now().toISOString() }, now()) as any
+    const body = offlineOrderBody(
+      menu,
+      { ...input, clientId: '6f1c2a9e-7a0b-4c55-9a43-3e2f7c1d8b10', receiptNo: 'AB12-0007', soldAt: now().toISOString() },
+      now()
+    ) as any
     const shown = offlineCounterOrder(menu, input, -5, now(), 'AB12-0007')
     expect(body).toMatchObject({
       restaurantId: cafe.id,
@@ -341,7 +369,14 @@ describe('cashier sign-in on bad internet', () => {
 })
 
 describe('a slow connection never holds the till', () => {
-  const ok = (config: InternalAxiosRequestConfig) => ({ data: { data: { id: 77 } }, status: 201, statusText: 'Created', headers: {}, config, request: {} })
+  const ok = (config: InternalAxiosRequestConfig) => ({
+    data: { data: { id: 77 } },
+    status: 201,
+    statusText: 'Created',
+    headers: {},
+    config,
+    request: {},
+  })
   const charge = (adapter: AxiosAdapter) =>
     adapter({
       method: 'post',
@@ -367,13 +402,23 @@ describe('a slow connection never holds the till', () => {
   })
 
   it('answers straight away when the server is quick', async () => {
-    const res = await charge(withOffline(async (config) => ok(config), async () => ({ data: {} })))
+    const res = await charge(
+      withOffline(
+        async (config) => ok(config),
+        async () => ({ data: {} })
+      )
+    )
     expect(offlineKind(res)).toBeNull()
     expect(await listOps(SCOPE)).toEqual([])
   })
 
   it('keeps it when the request fails without an answer, even if the browser thinks it’s online', async () => {
-    const res = await charge(withOffline(async () => Promise.reject(netErr()), async () => ({ data: {} })))
+    const res = await charge(
+      withOffline(
+        async () => Promise.reject(netErr()),
+        async () => ({ data: {} })
+      )
+    )
     expect(offlineKind(res)).toBe('queued')
     expect((await listOps(SCOPE))[0].data).toMatchObject({ clientId: 'cid-12345678' })
   })

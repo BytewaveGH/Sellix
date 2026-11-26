@@ -122,7 +122,8 @@ export const classifyCheckoutError = (err: any, names: Record<string, string> = 
     const parsed = parseInsufficientStock(message)
     return { ok: false, kind: 'stock', message: `Not enough stock — nothing was charged. ${message}`, productId: parsed?.productId }
   }
-  if (status === 422) return { ok: false, kind: 'invalid', message: err?.response?.data?.code ? message : `Some items are invalid: ${message}` }
+  if (status === 422)
+    return { ok: false, kind: 'invalid', message: err?.response?.data?.code ? message : `Some items are invalid: ${message}` }
   return { ok: false, kind: 'other', message }
 }
 
@@ -154,8 +155,15 @@ export const submitSale = async (
     timeout: SALE_TIMEOUT_MS,
     offline: offline
       ? {
-          label: `Sale ${payload.receiptNo ?? ''} · ₵${offline.preview.totalAmount.toFixed(2)} · ${offline.preview.paymentType}`.replace('  ', ' '),
-          result: () => ({ ...offline.preview, receiptNo: payload.receiptNo, createdAt: offline.preview.createdAt ?? new Date().toISOString() }),
+          label: `Sale ${payload.receiptNo ?? ''} · ₵${offline.preview.totalAmount.toFixed(2)} · ${offline.preview.paymentType}`.replace(
+            '  ',
+            ' '
+          ),
+          result: () => ({
+            ...offline.preview,
+            receiptNo: payload.receiptNo,
+            createdAt: offline.preview.createdAt ?? new Date().toISOString(),
+          }),
           // The server recognises the clientId and never records it twice.
           safeToRepeat: !!payload.clientId,
           // Slow connection: after this long the sale is kept on the till and
@@ -205,7 +213,9 @@ export const deductSoldStock = (body: unknown, sale: Pick<SalePayload, 'warehous
         ...p,
         ...(typeof p.totalQuantity === 'number' ? { totalQuantity: p.totalQuantity - n } : {}),
         ...(Array.isArray(p.stock)
-          ? { stock: p.stock.map((s: any) => (Number(s.warehouseId) === sale.warehouseId ? { ...s, quantity: Number(s.quantity) - n } : s)) }
+          ? {
+              stock: p.stock.map((s: any) => (Number(s.warehouseId) === sale.warehouseId ? { ...s, quantity: Number(s.quantity) - n } : s)),
+            }
           : {}),
       }
     })

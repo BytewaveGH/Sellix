@@ -57,7 +57,12 @@ export const initialsFor = (name: string) =>
     .split(/\s+/)
     .filter((w) => /[A-Za-z0-9]/.test(w))
     .slice(0, 2)
-    .map((w) => w.replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase())
+    .map((w) =>
+      w
+        .replace(/[^A-Za-z0-9]/g, '')
+        .charAt(0)
+        .toUpperCase()
+    )
     .join('') || 'S'
 
 // Query values → safe params, or null if this isn't a public page.
@@ -129,7 +134,11 @@ export const iconParams = (q: URLSearchParams) => {
   const size = Number(q.get('size'))
   return {
     size: (ICON_SIZES as readonly number[]).includes(size) ? size : 192,
-    text: (q.get('text') ?? 'S').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'S',
+    text:
+      (q.get('text') ?? 'S')
+        .replace(/[^A-Za-z0-9]/g, '')
+        .slice(0, 2)
+        .toUpperCase() || 'S',
     bg: HEX.test(q.get('bg') ?? '') ? q.get('bg')! : '#0865AC',
     fg: HEX.test(q.get('fg') ?? '') ? q.get('fg')! : '#FFFFFF',
     maskable: q.get('maskable') === '1',

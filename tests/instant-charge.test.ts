@@ -9,14 +9,31 @@ import { reportReachable } from '@/lib/connection'
 
 const SCOPE = 'acme:7'
 const httpErr = (status: number) => Object.assign(new Error(String(status)), { isAxiosError: true, response: { status, data: {} } })
-const ok = (config: InternalAxiosRequestConfig, data: unknown) => ({ data, status: 200, statusText: 'OK', headers: {}, config, request: {} })
+const ok = (config: InternalAxiosRequestConfig, data: unknown) => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config,
+  request: {},
+})
 
 const order = (n: number) => ({
   method: 'post',
   url: '/eatery/orders/counter',
-  data: { clientId: `client-${String(n).padStart(4, '0')}`, receiptNo: `AB12-${n}`, deviceId: 'till-1', lines: [{ itemId: 1, quantity: 1 }] },
+  data: {
+    clientId: `client-${String(n).padStart(4, '0')}`,
+    receiptNo: `AB12-${n}`,
+    deviceId: 'till-1',
+    lines: [{ itemId: 1, quantity: 1 }],
+  },
 })
-const localFirst = { localFirst: true, safeToRepeat: true, appendTo: '/eatery/orders', result: (id: number) => ({ code: 'AB12', total: 22, id }) }
+const localFirst = {
+  localFirst: true,
+  safeToRepeat: true,
+  appendTo: '/eatery/orders',
+  result: (id: number) => ({ code: 'AB12', total: 22, id }),
+}
 
 beforeEach(() => {
   setOfflineStore(memoryStore())
@@ -29,7 +46,17 @@ describe('Charge writes to the PC only', () => {
     const hang: AxiosAdapter = () => new Promise(() => undefined)
     const send = async (req: SendRequest) => {
       sent++
-      return { data: { data: { results: (req.data as { orders: { clientId: string }[] }).orders.map((o) => ({ clientId: o.clientId, status: 'created', id: 900 })) } } }
+      return {
+        data: {
+          data: {
+            results: (req.data as { orders: { clientId: string }[] }).orders.map((o) => ({
+              clientId: o.clientId,
+              status: 'created',
+              id: 900,
+            })),
+          },
+        },
+      }
     }
     const adapter = withOffline(hang, send)
     const started = Date.now()
@@ -59,8 +86,14 @@ describe('Charge writes to the PC only', () => {
 
   it('reports what was sent, with real ids, so screens swap them in place', async () => {
     await queueWrite(SCOPE, order(3), localFirst)
-    const result = await syncOutbox(SCOPE, async () => ({ data: { data: { results: [{ clientId: 'client-0003', status: 'created', id: 4242 }] } } }))
-    expect(result).toMatchObject({ sent: 1, paths: ['/eatery/orders'], made: [{ path: '/eatery/orders', row: { id: 4242, code: 'AB12' } }] })
+    const result = await syncOutbox(SCOPE, async () => ({
+      data: { data: { results: [{ clientId: 'client-0003', status: 'created', id: 4242 }] } },
+    }))
+    expect(result).toMatchObject({
+      sent: 1,
+      paths: ['/eatery/orders'],
+      made: [{ path: '/eatery/orders', row: { id: 4242, code: 'AB12' } }],
+    })
   })
 })
 
@@ -86,7 +119,15 @@ describe('the outbox after a long outage', () => {
       expect((await pendingRows(SCOPE, '/eatery/orders')).map((r) => r.syncState)).toEqual(['syncing', 'syncing', 'syncing'])
     }
     await syncOutbox(SCOPE, async (req) => ({
-      data: { data: { results: (req.data as { orders: { clientId: string }[] }).orders.map((o) => ({ clientId: o.clientId, status: 'duplicate', id: 7 })) } },
+      data: {
+        data: {
+          results: (req.data as { orders: { clientId: string }[] }).orders.map((o) => ({
+            clientId: o.clientId,
+            status: 'duplicate',
+            id: 7,
+          })),
+        },
+      },
     }))
     expect(await listOps(SCOPE)).toEqual([])
   })
@@ -96,21 +137,33 @@ describe('the counter screen doesn’t wait for the menu', () => {
   it('reads the menu from the PC without calling the server', async () => {
     await saveRead(SCOPE, { url: '/eatery/menu-items/' }, { data: [{ id: 1, name: 'Jollof' }] })
     let calls = 0
-    const adapter = withOffline(async (config) => {
-      calls++
-      return ok(config, { data: [] })
-    }, async () => ({ data: {} }))
-    const res = await adapter({ method: 'get', url: '/eatery/menu-items/', headers: {}, _scope: SCOPE, offline: { cacheFirst: true } } as unknown as InternalAxiosRequestConfig)
+    const adapter = withOffline(
+      async (config) => {
+        calls++
+        return ok(config, { data: [] })
+      },
+      async () => ({ data: {} })
+    )
+    const res = await adapter({
+      method: 'get',
+      url: '/eatery/menu-items/',
+      headers: {},
+      _scope: SCOPE,
+      offline: { cacheFirst: true },
+    } as unknown as InternalAxiosRequestConfig)
     expect(res.data).toEqual({ data: [{ id: 1, name: 'Jollof' }] })
     expect(calls).toBe(0)
   })
 
   it('writes the server’s answer into the kept lists, so they never go stale', async () => {
     await saveRead(SCOPE, { url: '/eatery/menu-items/' }, { data: [{ id: 1, name: 'Jollof', price: 40 }] })
-    const adapter = withOffline(async (config) => {
-      const body = JSON.parse(String(config.data))
-      return ok(config, JSON.stringify({ data: config.method === 'post' ? { ...body, id: 2 } : { ...body, id: 1 } }))
-    }, async () => ({ data: {} }))
+    const adapter = withOffline(
+      async (config) => {
+        const body = JSON.parse(String(config.data))
+        return ok(config, JSON.stringify({ data: config.method === 'post' ? { ...body, id: 2 } : { ...body, id: 1 } }))
+      },
+      async () => ({ data: {} })
+    )
     const call = (method: string, url: string, data: unknown) =>
       adapter({ method, url, data: JSON.stringify(data), headers: {}, _scope: SCOPE } as unknown as InternalAxiosRequestConfig)
     await call('put', '/eatery/menu-items/1', { name: 'Jollof', price: 45 })

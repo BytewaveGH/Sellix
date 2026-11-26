@@ -126,7 +126,13 @@ export const tempIdsIn = (r: { url?: string; data?: unknown }): number[] => {
 // Swap a temporary id for the real one everywhere in a request.
 export const replaceId = <T extends { url?: string; data?: unknown }>(r: T, temp: number, real: number): T => {
   const swap = (v: unknown): unknown =>
-    v === temp ? real : Array.isArray(v) ? v.map(swap) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)])) : v
+    v === temp
+      ? real
+      : Array.isArray(v)
+        ? v.map(swap)
+        : v && typeof v === 'object'
+          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)]))
+          : v
   const url = (r.url ?? '').replace(new RegExp(`/${temp}(?=/|$|\\?)`, 'g'), `/${real}`)
   return { ...r, url, data: swap(r.data) }
 }
@@ -184,7 +190,12 @@ export const describeWrite = (r: RequestLike): string => {
   const shape = writeShape(r)
   const path = pathOf(r)
   const noun = (p: string) =>
-    (p.split('/').filter((s) => s && !isId(s)).pop() ?? 'item')
+    (
+      p
+        .split('/')
+        .filter((s) => s && !isId(s))
+        .pop() ?? 'item'
+    )
       .replace(/[-_]/g, ' ')
       .replace(/ies$/, 'y')
       .replace(/s$/, '')

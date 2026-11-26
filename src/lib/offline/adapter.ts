@@ -9,7 +9,18 @@
 import { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { getConnection, reportReachable, reportUnreachable } from '../connection'
 import { isUnreachableError, SLOW_MS } from '../network'
-import { cachedRead, listOps, queueWrite, refreshRead, saveRead, settleKept, showWritten, syncOutbox, type OfflineOptions, type Send } from './engine'
+import {
+  cachedRead,
+  listOps,
+  queueWrite,
+  refreshRead,
+  saveRead,
+  settleKept,
+  showWritten,
+  syncOutbox,
+  type OfflineOptions,
+  type Send,
+} from './engine'
 import { cannotKeepRead, cannotQueue, methodOf, readKey, tempIdsIn } from './rules'
 
 export type OfflineConfig = {
@@ -26,7 +37,10 @@ export const OFFLINE_HEADER = 'x-sellix-offline'
 // Did this answer come from the device rather than the server?
 export const offlineKind = (res: { headers?: unknown } | undefined): 'cached' | 'queued' | null => {
   const h = res?.headers as Record<string, unknown> | { get?: (k: string) => unknown } | undefined
-  const v = typeof (h as { get?: unknown })?.get === 'function' ? (h as { get: (k: string) => unknown }).get(OFFLINE_HEADER) : (h as Record<string, unknown>)?.[OFFLINE_HEADER]
+  const v =
+    typeof (h as { get?: unknown })?.get === 'function'
+      ? (h as { get: (k: string) => unknown }).get(OFFLINE_HEADER)
+      : (h as Record<string, unknown>)?.[OFFLINE_HEADER]
   return v === 'cached' || v === 'queued' ? v : null
 }
 
@@ -110,9 +124,13 @@ export const withOffline = (base: AxiosAdapter, send: Send, readGraceMs = READ_G
       // copy at once, and the server's answer replaces it when it comes.
       let timer: ReturnType<typeof setTimeout> | undefined
       const grace = new Promise<'slow'>((resolve) => (timer = setTimeout(() => resolve('slow'), readGraceMs)))
-      const first = await Promise.race([network.then((res) => ({ res }), (err: unknown) => ({ err })), grace]).finally(() =>
-        clearTimeout(timer)
-      )
+      const first = await Promise.race([
+        network.then(
+          (res) => ({ res }),
+          (err: unknown) => ({ err })
+        ),
+        grace,
+      ]).finally(() => clearTimeout(timer))
       if (first !== 'slow' && 'res' in first) {
         if (first.res.status >= 200 && first.res.status < 300) void saveRead(scope, c, first.res.data)
         return first.res
@@ -180,7 +198,13 @@ export const withOffline = (base: AxiosAdapter, send: Send, readGraceMs = READ_G
       // server ignores it if it did arrive).
       let timer: ReturnType<typeof setTimeout> | undefined
       const deadline = new Promise<'slow'>((resolve) => (timer = setTimeout(() => resolve('slow'), options.waitMs)))
-      const first = await Promise.race([live.then((res) => ({ res }), (err: unknown) => ({ err })), deadline]).finally(() => clearTimeout(timer))
+      const first = await Promise.race([
+        live.then(
+          (res) => ({ res }),
+          (err: unknown) => ({ err })
+        ),
+        deadline,
+      ]).finally(() => clearTimeout(timer))
       if (first === 'slow') {
         const { op, body } = await queueWrite(scope, c, options)
         reportReachable(SLOW_MS + 1)

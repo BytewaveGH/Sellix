@@ -171,7 +171,10 @@ describe('no session round trip before each request', () => {
     const { setSession } = await import('@/lib/session-store')
     const { apiClient } = await import('@/lib/axios-client')
     getSession.mockClear()
-    setSession({ user: { accessToken: 'tok', accessTokenExpiry: Math.floor(Date.now() / 1000) + 3600, tenant: 'acme' }, expires: '' } as any)
+    setSession({
+      user: { accessToken: 'tok', accessTokenExpiry: Math.floor(Date.now() / 1000) + 3600, tenant: 'acme' },
+      expires: '',
+    } as any)
     let auth = ''
     apiClient.defaults.adapter = async (config) => {
       auth = String(config.headers?.Authorization)

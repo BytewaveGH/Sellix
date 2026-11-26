@@ -1,7 +1,21 @@
 'use client'
 
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Search, Plus, Minus, Trash2, ShoppingCart, Package, X, Zap, ScanLine, Barcode, CheckCircle2, Printer, CloudOff } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  Minus,
+  Trash2,
+  ShoppingCart,
+  Package,
+  X,
+  Zap,
+  ScanLine,
+  Barcode,
+  CheckCircle2,
+  Printer,
+  CloudOff,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PopoverTemplate } from '@/components/templates/popover'
 import { Sheet, SheetContent, SheetClose } from '@/components/ui/sheet'
@@ -392,7 +406,11 @@ const Main = () => {
   const { data: warehousesData } = useFetchData('warehouses', WarehouseServices.FetchAll() as unknown as IGeneric)
   const warehouses = (warehousesData as any[] | undefined) ?? []
 
-  const { data: rawProducts, isLoading, refetch: refetchProducts } = useFetchData('pos-products', ProductServices.FetchAll({ limit: 1000, offset: 0 }))
+  const {
+    data: rawProducts,
+    isLoading,
+    refetch: refetchProducts,
+  } = useFetchData('pos-products', ProductServices.FetchAll({ limit: 1000, offset: 0 }))
 
   const products: Product[] = useMemo(() => ((rawProducts as any[] | undefined) ?? []).map(mapApiProduct), [rawProducts])
 
@@ -690,8 +708,8 @@ const Main = () => {
           <div role="status" className="flex items-start gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 mb-1">
             <span className="text-rose-500 text-xs">⚠</span>
             <p className="text-xs text-rose-700">
-              <span className="font-bold">You’re offline.</span> Keep selling: sales are saved on this till and recorded when the
-              connection is back.
+              <span className="font-bold">You’re offline.</span> Keep selling: sales are saved on this till and recorded when the connection
+              is back.
             </p>
           </div>
         )}

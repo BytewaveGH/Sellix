@@ -20,7 +20,8 @@ export const billingApi = {
   saveCatalog: (catalog: Catalog) =>
     call<Catalog>('/api/platform/billing/catalog', { method: 'PUT', body: JSON.stringify(catalog) }, 'Couldn’t save plans'),
   subscriptions: () => call<Subscription[]>('/api/platform/subscriptions', undefined, 'Couldn’t load subscriptions').then((d) => d ?? []),
-  usage: (tenantId: number) => call<UsageReport | null>(`/api/platform/tenants/${tenantId}/usage`, undefined, 'Couldn’t load sales for billing'),
+  usage: (tenantId: number) =>
+    call<UsageReport | null>(`/api/platform/tenants/${tenantId}/usage`, undefined, 'Couldn’t load sales for billing'),
   act: (tenantId: number, action: BillingAction) =>
     call<Subscription>(
       `/api/platform/tenants/${tenantId}/subscription`,
