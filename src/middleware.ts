@@ -3,7 +3,8 @@ import createMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
 import type { NextRequest } from 'next/server'
 import type { NextAuthRequest } from 'next-auth'
-import { classifyHost } from '@/lib/tenant'
+import { classifyHost, redirectPathForAppType } from '@/lib/tenant'
+import { LAST_PAGE_COOKIE, lastPageFor, whoFor } from '@/lib/last-page'
 
 const intlMiddleware = createMiddleware(routing)
 
@@ -123,6 +124,29 @@ export default auth((req: NextAuthRequest) => {
     EAT_RE.test(pathname) ||
     RENTALS_RE.test(pathname) ||
     pathname === '/'
+
+  // Already signed in, on the sign-in page (or the bare site): go to the
+  // dashboard. The installed phone app always opens on "/" (manifest.ts), so
+  // without this, closing and reopening it showed the sign-in every time even
+  // though the session was still good. If the session has gone bad, the
+  // dashboard signs out as usual (refresh-token-handler) and lands back here
+  // signed out. The staff sign-in stays reachable, for handing a device over.
+  // (A real user, not an auth error object, so a misconfigured server still shows sign-in.)
+  if (isLoggedIn && authUser?.accountType && (pathname === '/' || /^\/(en|fr)\/?$/.test(pathname))) {
+    const locale = pathname.split('/')[1] === 'fr' ? 'fr' : 'en'
+    // The installed app goes back to the screen it was last on (src/lib/last-page.ts);
+    // that page's own checks (permissions, super-admin) still run on the next request.
+    const last = lastPageFor(req.cookies.get(LAST_PAGE_COOKIE)?.value, whoFor(authUser))
+    const home = last
+      ? last
+      : authUser?.accountType === 'super-admin'
+        ? `/${locale}/super-admin`
+        : authUser?.accountType === 'employee'
+          ? firstAllowedPath(authUser, locale)
+          : redirectPathForAppType(authUser?.appType, locale)
+    // An employee with no permissions would be sent to /staff, not back here.
+    return Response.redirect(new URL(home, req.url))
+  }
 
   if (!isLoggedIn && !isAuthPage) {
     return Response.redirect(new URL('/en', req.url))

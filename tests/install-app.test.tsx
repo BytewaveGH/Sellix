@@ -126,15 +126,15 @@ describe('first-visit install card (phones and tablets)', () => {
     setUa('Mozilla/5.0 (Linux; Android 14) Mobile')
     nav.path = '/en/eat/kofi-and-crumb'
     const Page = () => {
-      usePublicApp({ path: '/en/eat/kofi-and-crumb', name: 'Kofi & Crumb', bg: '#D4572A', fg: '#FFFFFF' })
+      usePublicApp({ path: '/en/eat/kofi-and-crumb', bg: '#D4572A', fg: '#FFFFFF' })
       return <InstallCard />
     }
     render(<Page />)
-    expect(await screen.findByText('Add Kofi & Crumb to your home screen')).toBeTruthy()
+    expect(await screen.findByText('Add Kofi And Crumb to your home screen')).toBeTruthy()
     expect(screen.getByText(/Order again in one tap/)).toBeTruthy()
     // Its own manifest and home-screen icon.
-    expect(document.head.querySelector('link[rel="manifest"]')?.getAttribute('href')).toMatch(/^\/api\/app-manifest\?path=%2Fen%2Feat%2Fkofi-and-crumb&name=Kofi\+%26\+Crumb/)
-    expect(document.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href')).toMatch(/^\/api\/app-icon\?text=KC&bg=%23D4572A/)
+    expect(document.head.querySelector('link[rel="manifest"]')?.getAttribute('href')).toMatch(/^\/api\/app-manifest\?path=%2Fen%2Feat%2Fkofi-and-crumb&name=Kofi\+And\+Crumb/)
+    expect(document.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href')).toMatch(/^\/api\/app-icon\?text=KA&bg=%23D4572A/)
     // "Not now" there doesn't hide the dashboard's own card.
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
     expect(Object.keys(localStorage).some((k) => k.endsWith(':/en/eat/kofi-and-crumb'))).toBe(true)

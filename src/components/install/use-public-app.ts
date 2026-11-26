@@ -6,7 +6,8 @@
 // put back when the customer leaves.
 
 import { useEffect } from 'react'
-import { appQuery, iconUrl, type PublicAppParams } from '@/lib/public-app'
+import { appQuery, iconUrl, publicAppName, type PublicAppParams } from '@/lib/public-app'
+import { clientTenantSlug } from '@/lib/tenant'
 import { setPublicApp } from './install-state'
 
 export const APP_TITLE_META = 'apple-mobile-web-app-title'
@@ -19,7 +20,11 @@ const ensure = <T extends HTMLElement>(selector: string, make: () => T) => {
   return { el, made: true }
 }
 
-export const usePublicApp = (app: PublicAppParams | null | undefined) => {
+// The name follows the address (publicAppName), as in the page's HTML.
+export type PublicAppInput = Omit<PublicAppParams, 'name'>
+
+export const usePublicApp = (input: PublicAppInput | null | undefined) => {
+  const app: PublicAppParams | null = input ? { ...input, name: publicAppName(input.path, clientTenantSlug()) } : null
   const key = app ? appQuery(app) : ''
   useEffect(() => {
     if (!app) return
@@ -53,7 +58,7 @@ export const usePublicApp = (app: PublicAppParams | null | undefined) => {
 }
 
 // For the directories' server layouts.
-export const PublicApp = ({ app }: { app: PublicAppParams }) => {
+export const PublicApp = ({ app }: { app: PublicAppInput }) => {
   usePublicApp(app)
   return null
 }

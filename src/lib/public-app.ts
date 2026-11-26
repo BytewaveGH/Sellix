@@ -16,6 +16,30 @@ export type PublicAppParams = {
   logo?: string
 }
 
+// "belkis-hub" → "Belkis Hub"
+export const businessName = (slug: string) =>
+  slug
+    .split('-')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+// The installed app's name: the business's subdomain; on the main site, the
+// storefront or rentals site's own address; the directories are Sellix Eats
+// and Sellix Homes; anything else plain Sellix.
+export const publicAppName = (path: string, hostSlug: string | null | undefined) => {
+  if (hostSlug) return businessName(hostSlug)
+  const m = path.match(/^\/(?:en|fr)\/(eat|rentals)(?:\/([^/?#]+))?/)
+  if (m?.[2]) {
+    let site = m[2]
+    try {
+      site = decodeURIComponent(site)
+    } catch {}
+    return cleanName(businessName(site.replace(/[^A-Za-z0-9-]+/g, '-'))) || 'Sellix'
+  }
+  return m?.[1] === 'eat' ? 'Sellix Eats' : m?.[1] === 'rentals' ? 'Sellix Homes' : 'Sellix'
+}
+
 // Storefronts, rentals sites and their directories. Never the dashboards.
 export const PUBLIC_APP_PATH = /^\/(?:en|fr)\/(?:eat|rentals)(?:\/[A-Za-z0-9._~%-]{1,120})?\/?$/
 
@@ -84,6 +108,17 @@ export const publicManifest = (p: PublicAppParams) => ({
     { src: iconUrl(p, 512, true), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
 })
+
+// In the page's HTML from the start (the public layouts' generateMetadata), so
+// a phone saving the page never picks up the dashboard's manifest, whose start
+// page is the sign-in. The page then adds its colour and logo (usePublicApp).
+export const publicAppMetadata = (path: string, hostSlug: string | null | undefined) => {
+  const name = publicAppName(path, hostSlug)
+  return {
+    manifest: `/api/app-manifest?${appQuery({ path, name, bg: '#0865AC', fg: '#FFFFFF' })}`,
+    appleWebApp: { capable: true, title: name, statusBarStyle: 'default' as const },
+  }
+}
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 
