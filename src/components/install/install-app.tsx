@@ -10,6 +10,7 @@
 // button for websites, so they get the two steps instead.
 
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { Download, EllipsisVertical, Share, SquarePlus, WifiOff, X } from 'lucide-react'
 import { store, useInstall, type InstallKind } from './install-state'
@@ -25,7 +26,7 @@ const Steps = ({ kind }: { kind: Exclude<InstallKind, 'prompt' | null> }) =>
   kind === 'ios' ? (
     <ol className="mt-1.5 list-decimal pl-4 space-y-1">
       <li>
-        Tap <Share className="inline h-3.5 w-3.5 -mt-0.5" aria-label="Share" /> (in Safari, at the bottom or top of the screen)
+        Tap <Share className="inline h-3.5 w-3.5 -mt-0.5" aria-label="Share" /> in Safari (at the bottom of the screen; on newer iPhones it’s under <b>•••</b>)
       </li>
       <li>
         Choose <b>Add to Home Screen</b> <SquarePlus className="inline h-3.5 w-3.5 -mt-0.5" aria-hidden />
@@ -105,6 +106,10 @@ export const GetAppButton = ({ className, style }: { className?: string; style?:
   const [help, setHelp] = useState(false)
   if (!kind || !publicApp) return null
   const icon = document.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href') || '/icons/icon-192.png'
+  // The system share sheet, opened from the page (iPhones have it; some
+  // computers too). It's where Add to Home Screen lives in Safari.
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  const share = () => void navigator.share({ title: publicApp.name, url: window.location.href }).catch(() => {})
 
   return (
     <>
@@ -119,36 +124,50 @@ export const GetAppButton = ({ className, style }: { className?: string; style?:
         <Download className="h-4 w-4" />
         <span className="hidden min-[380px]:inline">Get the app</span>
       </button>
-      {help && kind !== 'prompt' && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-3" onClick={() => setHelp(false)}>
-          <div
-            role="dialog"
-            aria-label={`Get the ${publicApp.name} app`}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-white p-4 text-stone-700 shadow-2xl pb-[max(1rem,env(safe-area-inset-bottom))]"
-          >
-            <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={icon} alt="" className="h-12 w-12 rounded-xl border border-stone-100" />
-              <p className="min-w-0 flex-1 text-[15px] font-bold text-stone-900">Add {publicApp.name} to your home screen</p>
-              <button
-                type="button"
-                onClick={() => setHelp(false)}
-                aria-label="Close"
-                className="h-8 w-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
+      {/* On the page itself, not inside the header: the sticky, blurred
+          headers would otherwise trap a full-screen sheet in a 64px strip. */}
+      {help &&
+        kind !== 'prompt' &&
+        createPortal(
+          <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-3" onClick={() => setHelp(false)}>
+            <div
+              role="dialog"
+              aria-label={`Get the ${publicApp.name} app`}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl bg-white p-4 text-stone-700 shadow-2xl pb-[max(1rem,env(safe-area-inset-bottom))]"
+            >
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={icon} alt="" className="h-12 w-12 rounded-xl border border-stone-100" />
+                <p className="min-w-0 flex-1 text-[15px] font-bold text-stone-900">Add {publicApp.name} to your home screen</p>
+                <button
+                  type="button"
+                  onClick={() => setHelp(false)}
+                  aria-label="Close"
+                  className="h-8 w-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm text-stone-600">
+                <Steps kind={kind} />
+              </div>
+              {kind === 'ios' && canShare && (
+                <button
+                  type="button"
+                  onClick={share}
+                  className="mt-3 h-11 w-full rounded-xl bg-stone-900 text-sm font-semibold text-white inline-flex items-center justify-center gap-2"
+                >
+                  <Share className="h-4 w-4" /> Open the Share menu
+                </button>
+              )}
+              <p className="mt-2 text-xs text-stone-400">
+                {kind === 'ios' ? 'Apple only lets you add websites this way — it takes two taps.' : 'Your browser adds it from its menu.'}
+              </p>
             </div>
-            <div className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm text-stone-600">
-              <Steps kind={kind} />
-            </div>
-            <p className="mt-2 text-xs text-stone-400">
-              {kind === 'ios' ? 'Apple only lets you add websites this way — it takes two taps.' : 'Your browser adds it from its menu.'}
-            </p>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   )
 }
