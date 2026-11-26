@@ -168,3 +168,40 @@ describe('first-visit install card (phones and tablets)', () => {
     expect(screen.queryByRole('dialog', { name: 'Install Sellix' })).toBeNull()
   })
 })
+
+describe('public site manifest in the page', () => {
+  it('going from Sellix Eats to a storefront saves the storefront, not Sellix Eats', () => {
+    document.head.querySelectorAll('link[rel="manifest"]').forEach((l) => l.remove())
+    // What the server put in the Sellix Eats page (publicAppMetadata).
+    const link = Object.assign(document.createElement('link'), { rel: 'manifest' })
+    link.setAttribute('href', '/api/app-manifest?path=%2Fen%2Feat&name=Sellix+Eats')
+    document.head.appendChild(link)
+    const Directory = () => {
+      usePublicApp({ path: '/en/eat', bg: '#0865AC', fg: '#FFFFFF' })
+      return null
+    }
+    const page = render(<Directory />)
+    // Next moves to the storefront: its metadata writes the storefront's manifest…
+    const storefront = '/api/app-manifest?path=%2Fen%2Feat%2Fkofi-and-crumb&name=Kofi+And+Crumb'
+    link.setAttribute('href', storefront)
+    // …then Sellix Eats' page goes away. It must not put its own manifest back.
+    page.unmount()
+    expect(link.getAttribute('href')).toBe(storefront)
+    link.remove()
+  })
+
+  it('still tidies up after itself when nothing else changed the page', () => {
+    const link = Object.assign(document.createElement('link'), { rel: 'manifest' })
+    link.setAttribute('href', '/manifest.webmanifest')
+    document.head.appendChild(link)
+    const Directory = () => {
+      usePublicApp({ path: '/en/eat', bg: '#0865AC', fg: '#FFFFFF' })
+      return null
+    }
+    const page = render(<Directory />)
+    expect(link.getAttribute('href')).toMatch(/^\/api\/app-manifest\?path=%2Fen%2Feat&/)
+    page.unmount()
+    expect(link.getAttribute('href')).toBe('/manifest.webmanifest')
+    link.remove()
+  })
+})

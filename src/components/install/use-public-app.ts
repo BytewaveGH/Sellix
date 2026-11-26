@@ -40,18 +40,28 @@ export const usePublicApp = (input: PublicAppInput | null | undefined) => {
     title.el.setAttribute('content', app.name)
     setPublicApp({ path: app.path, name: app.name, kind: /\/rentals(\/|$)/.test(app.path) ? 'rentals' : 'eat' })
 
-    const restore = (el: Element, attr: string, v: string | null) => (v === null ? el.removeAttribute(attr) : el.setAttribute(attr, v))
+    const ours = { manifest: manifest.el.getAttribute('href'), touch: touch.el.getAttribute('href'), title: title.el.getAttribute('content') }
+    // Put things back only if they're still what we set. Moving from Sellix
+    // Eats to a storefront, Next has already written the storefront's manifest
+    // into the page by the time this runs; putting Sellix Eats' back would make
+    // "Add to Home Screen" save Sellix Eats instead of the storefront.
+    const restore = (el: Element, attr: string, mine: string | null, v: string | null) => {
+      if (el.getAttribute(attr) !== mine) return
+      if (v === null) el.removeAttribute(attr)
+      else el.setAttribute(attr, v)
+    }
     return () => {
       setPublicApp(null)
       if (manifest.made) manifest.el.remove()
-      else restore(manifest.el, 'href', saved[0])
+      else restore(manifest.el, 'href', ours.manifest, saved[0])
       if (touch.made) touch.el.remove()
-      else {
-        restore(touch.el, 'href', saved[1])
-        restore(touch.el, 'sizes', saved[2])
+      else if (touch.el.getAttribute('href') === ours.touch) {
+        restore(touch.el, 'href', ours.touch, saved[1])
+        if (saved[2] === null) touch.el.removeAttribute('sizes')
+        else touch.el.setAttribute('sizes', saved[2])
       }
       if (title.made) title.el.remove()
-      else restore(title.el, 'content', saved[3])
+      else restore(title.el, 'content', ours.title, saved[3])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
