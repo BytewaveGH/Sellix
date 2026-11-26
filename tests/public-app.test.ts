@@ -2,7 +2,7 @@
 // Public sites as their own installable apps (src/lib/public-app.ts and the
 // /api/app-manifest and /api/app-icon routes).
 import sharp from 'sharp'
-import { allowedLogoHost, iconParams, parseAppParams, publicManifest, shortName } from '@/lib/public-app'
+import { allowedLogoHost, iconParams, parseAppParams, publicAppMetadata, publicAppName, publicManifest, shortName } from '@/lib/public-app'
 import { GET as manifestRoute } from '@/app/api/app-manifest/route'
 import { GET as iconRoute } from '@/app/api/app-icon/route'
 
@@ -40,10 +40,26 @@ describe('public app manifest', () => {
     expect(iconParams(q({ size: '9999', text: '<s>' }))).toMatchObject({ size: 192, text: 'S' })
   })
 
-  it('the manifest route answers for public pages only', async () => {
-    const ok = await manifestRoute(new Request('http://x/api/app-manifest?path=%2Fen%2Feat&name=Sellix%20Eats'))
+  it('named after the subdomain, else the site, else Sellix Eats / Sellix Homes', () => {
+    expect(publicAppName('/en/eat/kofi-and-crumb', 'belkis-hub')).toBe('Belkis Hub')
+    expect(publicAppName('/en/eat', 'belkis-hub')).toBe('Belkis Hub')
+    expect(publicAppName('/en/eat/kofi-and-crumb', null)).toBe('Kofi And Crumb')
+    expect(publicAppName('/fr/rentals/asokwa%20lodge', null)).toBe('Asokwa Lodge')
+    expect(publicAppName('/en/eat', null)).toBe('Sellix Eats')
+    expect(publicAppName('/en/rentals', null)).toBe('Sellix Homes')
+    expect(publicAppName('/en/stores', null)).toBe('Sellix')
+  })
+
+  it('the page’s HTML points at the site’s own app, never the dashboard’s (whose start is the sign-in)', () => {
+    const md = publicAppMetadata('/en/eat/kofi-and-crumb', null)
+    expect(md.manifest).toMatch(/^\/api\/app-manifest\?path=%2Fen%2Feat%2Fkofi-and-crumb&/)
+    expect(md.appleWebApp.title).toBe('Kofi And Crumb')
+  })
+
+  it('the manifest route answers for public pages only, named by the address', async () => {
+    const ok = await manifestRoute(new Request('http://x/api/app-manifest?path=%2Fen%2Feat&name=Something%20Else'))
     expect(ok.headers.get('content-type')).toBe('application/manifest+json')
-    expect(await ok.json()).toMatchObject({ name: 'Sellix Eats', start_url: '/en/eat' })
+    expect(await ok.json()).toMatchObject({ name: 'Sellix Eats', start_url: '/en/eat', id: '/en/eat' })
     expect((await manifestRoute(new Request('http://x/api/app-manifest?path=%2Fen%2Fsuper-admin'))).status).toBe(400)
   })
 

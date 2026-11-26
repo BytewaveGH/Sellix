@@ -68,7 +68,7 @@ const Chips = <T extends string>({
 export default function SellixHomes() {
   const params = useParams()
   const locale = (params?.locale as string) || 'en'
-  usePublicApp({ path: `/${locale}/rentals`, name: 'Sellix Homes', bg: '#0865AC', fg: '#FFFFFF' })
+  usePublicApp({ path: `/${locale}/rentals`, bg: '#0865AC', fg: '#FFFFFF' })
   const { data, isLoading, error, refetch, isFetching } = useRentalsDirectory()
 
   const [query, setQuery] = useState('')
