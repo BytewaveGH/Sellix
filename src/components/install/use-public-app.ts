@@ -9,6 +9,7 @@ import { useEffect } from 'react'
 import { appQuery, iconUrl, publicAppName, type PublicAppParams } from '@/lib/public-app'
 import { clientTenantSlug } from '@/lib/tenant'
 import { setPublicApp } from './install-state'
+import { registerWorker } from '@/lib/offline/register-worker'
 
 export const APP_TITLE_META = 'apple-mobile-web-app-title'
 
@@ -35,9 +36,13 @@ export const usePublicApp = (input: PublicAppInput | null | undefined) => {
     const saved = [manifest.el.getAttribute('href'), touch.el.getAttribute('href'), touch.el.getAttribute('sizes'), title.el.getAttribute('content')]
 
     manifest.el.setAttribute('href', `/api/app-manifest?${key}`)
-    touch.el.setAttribute('href', iconUrl(app, 180))
+    // A logo kept in the page itself (saved on this device, not uploaded) can't
+    // go through the icon server; iPhones take it as it is.
+    touch.el.setAttribute('href', input?.logo && /^data:image\/(png|jpeg|webp);/.test(input.logo) ? input.logo : iconUrl(app, 180))
     touch.el.setAttribute('sizes', '180x180')
     title.el.setAttribute('content', app.name)
+    // Lets Android browsers offer the one-tap Install for this site.
+    registerWorker()
     setPublicApp({ path: app.path, name: app.name, kind: /\/rentals(\/|$)/.test(app.path) ? 'rentals' : 'eat' })
 
     const ours = { manifest: manifest.el.getAttribute('href'), touch: touch.el.getAttribute('href'), title: title.el.getAttribute('content') }

@@ -17,6 +17,7 @@ import {
 } from '@/app/[locale]/(real-estate)/real-estate/_logics/site'
 import { FacilitySummaryPill } from '@/app/[locale]/(real-estate)/real-estate/_components/facilities'
 import { SellixLogo } from '@/components/brand/sellix-logo'
+import { GetAppButton } from '@/components/install/install-app'
 
 // The site's colour, as a CSS variable every accent below reads.
 export const accentStyle = (accent: string) => ({ ['--accent' as string]: accent }) as React.CSSProperties
@@ -229,6 +230,8 @@ export const SiteHeader = ({ site, locale, slug }: { site: PublicSite['site']; l
         <BusinessMark business={site} />
         <span className="truncate text-[15px] font-extrabold text-stone-900">{site.name || 'Rooms to rent'}</span>
       </Link>
+      {/* Save this site to the home screen. */}
+      <GetAppButton className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:bg-stone-50" />
       {site.phone && (
         <a
           href={`tel:${site.phone.replace(/[^\d+]/g, '')}`}

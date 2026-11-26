@@ -94,6 +94,60 @@ export const InstallApp = () => {
   )
 }
 
+// ── "Get the app" on a public site's header ─────────────────────────────────
+
+// Always there (unlike the first-visit card, which "Not now" hides). Where the
+// browser allows it (Android's Chrome, Edge, Samsung Internet; Chrome and Edge
+// on computers) one tap installs the site. iPhones and iPads don't let any
+// website do that, so it shows the two steps there.
+export const GetAppButton = ({ className, style }: { className?: string; style?: React.CSSProperties }) => {
+  const { kind, publicApp, install } = useInstall()
+  const [help, setHelp] = useState(false)
+  if (!kind || !publicApp) return null
+  const icon = document.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href') || '/icons/icon-192.png'
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => (kind === 'prompt' ? void install() : setHelp(true))}
+        className={className}
+        style={style}
+        aria-label={`Get the ${publicApp.name} app`}
+        title="Add to your home screen"
+      >
+        <Download className="h-4 w-4" />
+        <span className="hidden min-[380px]:inline">Get the app</span>
+      </button>
+      {help && kind !== 'prompt' && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-3" onClick={() => setHelp(false)}>
+          <div
+            role="dialog"
+            aria-label={`Get the ${publicApp.name} app`}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl bg-white p-4 text-stone-700 shadow-2xl pb-[max(1rem,env(safe-area-inset-bottom))]"
+          >
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={icon} alt="" className="h-12 w-12 rounded-xl border border-stone-100" />
+              <p className="min-w-0 flex-1 text-[15px] font-bold text-stone-900">Add {publicApp.name} to your home screen</p>
+              <button type="button" onClick={() => setHelp(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm text-stone-600">
+              <Steps kind={kind} />
+            </div>
+            <p className="mt-2 text-xs text-stone-400">
+              {kind === 'ios' ? 'Apple only lets you add websites this way — it takes two taps.' : 'Your browser adds it from its menu.'}
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── First-visit card (phones and tablets) ───────────────────────────────────
 
 // The lobby board runs on a TV, and the console on the platform team's PCs.

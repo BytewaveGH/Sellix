@@ -15,6 +15,7 @@ import { MenuView, PromoBanner } from './menu-view'
 import { OrderMode, availableModes } from './order-mode'
 import { RestaurantFooter } from './restaurant-footer'
 import { BrandMark, ThemeScope } from './theme-scope'
+import { GetAppButton } from '@/components/install/install-app'
 
 // Why ordering is off right now, or null.
 export const orderingBlocked = (bundle: StorefrontBundle, now: Date) => {
@@ -102,6 +103,8 @@ export const Storefront = ({
           )}
           <BrandMark restaurant={restaurant} size={34} />
           <span className="e-display min-w-0 flex-1 truncate text-lg">{restaurant.name}</span>
+          {/* Save this restaurant to the home screen (only on its live page). */}
+          <GetAppButton className="flex h-11 items-center gap-1.5 rounded-full px-3 text-sm font-bold e-focus e-soft" />
           <button
             type="button"
             onClick={() => setCartOpen(true)}

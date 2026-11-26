@@ -2,7 +2,14 @@
 // Public sites as their own installable apps (src/lib/public-app.ts and the
 // /api/app-manifest and /api/app-icon routes).
 import sharp from 'sharp'
-import { allowedLogoHost, iconParams, parseAppParams, publicAppMetadata, publicAppName, publicManifest, shortName } from '@/lib/public-app'
+
+// Logo hosts resolve to a public address unless the test says otherwise.
+const dns = vi.hoisted(() => ({ addrs: {} as Record<string, string[]> }))
+vi.mock('node:dns/promises', () => ({
+  lookup: async (host: string) => (dns.addrs[host] ?? ['93.184.216.34']).map((address) => ({ address, family: address.includes(':') ? 6 : 4 })),
+}))
+
+import { isPublicAddress, logoUrlProblem, iconParams, parseAppParams, publicAppMetadata, publicAppName, publicManifest, shortName } from '@/lib/public-app'
 import { GET as manifestRoute } from '@/app/api/app-manifest/route'
 import { GET as iconRoute } from '@/app/api/app-icon/route'
 
@@ -31,12 +38,13 @@ describe('public app manifest', () => {
     expect(shortName('Blaze Grill')).toBe('Blaze Grill')
   })
 
-  it('logos are only fetched from our own API host or listed hosts', () => {
-    const env = { NEXT_PUBLIC_API_URL: 'https://api.sellix.app/v1', APP_ICON_HOSTS: 'cdn.sellix.app, images.example.com' }
-    expect(allowedLogoHost('https://api.sellix.app/uploads/logo.png', env)).toBe(true)
-    expect(allowedLogoHost('https://images.example.com/x.png', env)).toBe(true)
-    expect(allowedLogoHost('https://169.254.169.254/latest', env)).toBe(false)
-    expect(allowedLogoHost('http://api.sellix.app/logo.png', env)).toBe(false)
+  it('logos come from anywhere public, never inside our own network', () => {
+    for (const ip of ['93.184.216.34', '8.8.8.8', '2606:4700::1111', '172.32.0.1']) expect(isPublicAddress(ip)).toBe(true)
+    for (const ip of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', '::', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '::ffff:7f00:1', '999.1.1.1'])
+      expect(isPublicAddress(ip)).toBe(false)
+    expect(logoUrlProblem('https://res.cloudinary.com/x/logo.png')).toBeNull()
+    for (const u of ['http://cdn.example.com/a.png', 'https://user:pw@cdn.example.com/a.png', 'https://cdn.example.com:8443/a.png', 'https://localhost/a.png', 'https://db.internal/a.png', 'nope'])
+      expect(logoUrlProblem(u)).not.toBeNull()
     expect(iconParams(q({ size: '9999', text: '<s>' }))).toMatchObject({ size: 192, text: 'S' })
   })
 
@@ -75,22 +83,40 @@ describe('public app manifest', () => {
     const corner = await pixel(res, 2, 2)
     expect(corner.size).toEqual([512, 512])
     expect(corner.rgb).toEqual([255, 255, 255]) // the Sellix icon's white tile, not the brand colour
-    // A logo from a host we don't fetch from also gets the Sellix logo, never an error.
-    const other = await pixel(await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fevil.example%2Fa.png')), 2, 2)
-    expect(other).toEqual({ size: [192, 192], rgb: [255, 255, 255] })
+    // A logo that points inside our network gets the Sellix logo, never fetched.
+    dns.addrs['sneaky.example'] = ['10.0.0.5']
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      const other = await pixel(await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fsneaky.example%2Fa.png')), 2, 2)
+      expect(other).toEqual({ size: [192, 192], rgb: [255, 255, 255] })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
-  it('with a logo: uses the storefront’s logo', async () => {
-    const prev = process.env.NEXT_PUBLIC_API_URL
-    process.env.NEXT_PUBLIC_API_URL = 'https://api.sellix.test'
+  it('with a logo: uses the storefront’s logo, wherever it is stored', async () => {
     const red = await sharp({ create: { width: 300, height: 300, channels: 3, background: '#E01010' } }).png().toBuffer()
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(red), { headers: { 'content-type': 'image/png' } })))
     try {
-      const res = await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fapi.sellix.test%2Flogo.png'))
+      const res = await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fres.cloudinary.com%2Fsellix%2Flogo.png'))
       expect((await pixel(res, 96, 96)).rgb).toEqual([224, 16, 16])
     } finally {
       vi.unstubAllGlobals()
-      process.env.NEXT_PUBLIC_API_URL = prev
+    }
+  })
+
+  it('a redirect into our own network is not followed', async () => {
+    dns.addrs['metadata.example'] = ['169.254.169.254']
+    const fetchSpy = vi.fn(async () => new Response(null, { status: 302, headers: { location: 'https://metadata.example/latest' } }))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      const res = await iconRoute(new Request('http://x/api/app-icon?size=192&logo=https%3A%2F%2Fcdn.example.com%2Flogo.png'))
+      expect((await pixel(res, 2, 2)).rgb).toEqual([255, 255, 255])
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 })
