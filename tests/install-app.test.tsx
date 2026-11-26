@@ -13,7 +13,7 @@ const nav = vi.hoisted(() => ({ path: '/en' }))
 vi.mock('next/navigation', () => ({ usePathname: () => nav.path }))
 
 import manifest, { businessName } from '@/app/manifest'
-import { CARD_SNOOZE_MS, InstallApp, InstallCard } from '@/components/install/install-app'
+import { CARD_SNOOZE_MS, GetAppButton, InstallApp, InstallCard } from '@/components/install/install-app'
 import { resetInstallState } from '@/components/install/install-state'
 import { usePublicApp } from '@/components/install/use-public-app'
 import { DESKTOP_BUSINESS_META } from '@/lib/tenant'
@@ -203,5 +203,57 @@ describe('public site manifest in the page', () => {
     page.unmount()
     expect(link.getAttribute('href')).toBe('/manifest.webmanifest')
     link.remove()
+  })
+})
+
+
+describe('Get the app button on a public site', () => {
+  const ua = navigator.userAgent
+  const setUa = (v: string) => Object.defineProperty(navigator, 'userAgent', { value: v, configurable: true })
+  beforeEach(() => {
+    localStorage.clear()
+    resetInstallState()
+    nav.path = '/en/eat/kofi-and-crumb'
+    // (The card tests above leave the desktop app's marker in the page.)
+    document.head.querySelector(`meta[name="${DESKTOP_BUSINESS_META}"]`)?.remove()
+  })
+  afterEach(() => setUa(ua))
+  const Storefront = () => {
+    usePublicApp({ path: '/en/eat/kofi-and-crumb', bg: '#D4572A', fg: '#FFFFFF' })
+    return <GetAppButton />
+  }
+
+  it('Android: one tap installs the storefront, no steps', async () => {
+    setUa('Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile')
+    render(<Storefront />)
+    const prompt = vi.fn(async () => {})
+    act(() => void window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome: 'accepted' }) })))
+    fireEvent.click(await screen.findByRole('button', { name: 'Get the Kofi And Crumb app' }))
+    await act(async () => {})
+    expect(prompt).toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('iPhone: shows the two steps with the storefront’s icon', async () => {
+    setUa('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)')
+    render(<Storefront />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Get the Kofi And Crumb app' }))
+    const sheet = screen.getByRole('dialog', { name: 'Get the Kofi And Crumb app' })
+    expect(sheet.textContent).toContain('Add to Home Screen')
+    expect(sheet.querySelector('img')?.getAttribute('src')).toMatch(/^\/api\/app-icon\?/)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('not on the dashboard’s pages, nor once installed', () => {
+    setUa('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)')
+    nav.path = '/en/eatery'
+    const a = render(<GetAppButton />)
+    expect(screen.queryByRole('button', { name: /Get the/ })).toBeNull()
+    a.unmount()
+    window.matchMedia = ((q: string) => ({ matches: q.includes('standalone'), media: q, addEventListener() {}, removeEventListener() {} })) as any
+    render(<Storefront />)
+    expect(screen.queryByRole('button', { name: /Get the/ })).toBeNull()
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as any
   })
 })

@@ -16,6 +16,7 @@ import { getConnection, useConnection } from '../connection'
 import { discardOp, isSyncing, listOps, retryOp, subscribeOutbox, subscribeSynced, syncOutbox, type Op, type SyncResult } from './engine'
 import type { Query, QueryClient } from '@tanstack/react-query'
 import { subscribeReadUpdates } from './adapter'
+import { registerWorker } from './register-worker'
 
 // The API lists a query holds (`meta.paths`), if it says.
 const queryPaths = (q: Query) => ((q.meta as { paths?: unknown } | undefined)?.paths as string[] | undefined) ?? []
@@ -69,17 +70,6 @@ const syncCatalogue = async (scope: string, appType?: string, onMenuChanged?: ()
 }
 
 // ── Service worker ──────────────────────────────────────────────────────────
-
-let registered = false
-const registerWorker = () => {
-  if (registered || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
-  // Development rebuilds code on every change; keeping it would serve stale screens.
-  if (process.env.NODE_ENV !== 'production') return
-  registered = true
-  navigator.serviceWorker.register('/sw.js').catch(() => {
-    registered = false
-  })
-}
 
 // The dashboard's own screens, from its menus: kept so they open offline.
 const screensOnPage = () => {

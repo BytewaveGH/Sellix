@@ -2,7 +2,8 @@
 // a landlord's rentals site, or the directories — as its own app on their
 // phone: named after the business, in its colour, opening on its page.
 //
-// Its icon is the business's logo, or the Sellix logo when it has none.
+// Its icon is the business's logo (wherever it's stored), or the Sellix logo
+// when it has none or it can't be fetched.
 // The page knows the business (its data may only exist in the browser), so it
 // passes name, colours and logo to /api/app-manifest and /api/app-icon, which
 // only accept public pages and plain values. Pure helpers here, tested.
@@ -12,7 +13,7 @@ export type PublicAppParams = {
   name: string
   bg: string
   fg: string
-  // The logo, when it's an https image on a host we fetch from.
+  // The logo, when it's an https link (logos kept in the page itself can't be fetched).
   logo?: string
 }
 
@@ -79,7 +80,7 @@ export const appQuery = (p: PublicAppParams) => {
 export const iconUrl = (p: PublicAppParams, size: number, maskable = false) => {
   const q = new URLSearchParams({ text: initialsFor(p.name), bg: p.bg, fg: p.fg, size: String(size) })
   if (maskable) q.set('maskable', '1')
-  if (p.logo) q.set('logo', p.logo)
+  if (p.logo && /^https:\/\//i.test(p.logo) && p.logo.length <= 1000) q.set('logo', p.logo)
   return `/api/app-icon?${q.toString()}`
 }
 
@@ -136,19 +137,45 @@ export const iconParams = (q: URLSearchParams) => {
   }
 }
 
-// Logos are fetched only from our own API's host, or hosts listed in
-// APP_ICON_HOSTS (comma-separated) — never anything a visitor types.
-export const allowedLogoHost = (url: string, env: Record<string, string | undefined> = process.env) => {
-  try {
-    const u = new URL(url)
-    if (u.protocol !== 'https:') return false
-    const hosts = new Set(
-      [env.NEXT_PUBLIC_API_URL ? new URL(env.NEXT_PUBLIC_API_URL).host : '', ...(env.APP_ICON_HOSTS ?? '').split(',')]
-        .map((h) => h.trim().toLowerCase())
-        .filter(Boolean)
+// Logos can live anywhere public (the upload storage, a pasted link), so the
+// icon route fetches any https address, but never one that points inside our
+// own network: every address the name resolves to must be public.
+export const isPublicAddress = (ip: string): boolean => {
+  const v4 = ip.match(/^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/i)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    if ([a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) return false
+    return !(
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0) ||
+      (a === 198 && (b === 18 || b === 19))
     )
-    return hosts.has(u.host.toLowerCase())
-  } catch {
-    return false
   }
+  const v6 = ip.toLowerCase()
+  if (!v6.includes(':')) return false
+  if (v6 === '::' || v6 === '::1') return false
+  if (/^::ffff:/.test(v6)) return false // mapped forms not in dotted notation: refuse
+  return !/^(fc|fd|fe[89ab]|ff)/.test(v6)
+}
+
+// The parts of a logo address we check before looking it up.
+export const logoUrlProblem = (url: string): string | null => {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return 'not a link'
+  }
+  if (u.protocol !== 'https:') return 'not https'
+  if (u.username || u.password) return 'has credentials'
+  if (u.port && u.port !== '443') return 'odd port'
+  if (/^(localhost|.*\.localhost|.*\.local|.*\.internal)$/i.test(u.hostname)) return 'local name'
+  return null
 }

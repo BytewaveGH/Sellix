@@ -1,7 +1,8 @@
+import { lookup } from 'node:dns/promises'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
-import { allowedLogoHost, iconParams } from '@/lib/public-app'
+import { iconParams, isPublicAddress, logoUrlProblem } from '@/lib/public-app'
 
 // A public site's home-screen icon: the business's logo, squared. With no
 // logo — or one we can't fetch — the Sellix logo. Maskable icons keep the
@@ -10,13 +11,36 @@ export const runtime = 'nodejs'
 
 const MAX_BYTES = 5 * 1024 * 1024
 
-const fetchLogo = async (url: string): Promise<Buffer | null> => {
-  if (!allowedLogoHost(url)) return null
+// Wherever the logo is stored (upload storage, a pasted link), as long as the
+// address and every redirect stay on the public internet.
+const safeToFetch = async (url: string) => {
+  if (logoUrlProblem(url)) return false
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000), redirect: 'error' })
-    if (!res.ok || !/^image\//.test(res.headers.get('content-type') ?? '')) return null
-    const buf = Buffer.from(await res.arrayBuffer())
-    return buf.length <= MAX_BYTES ? buf : null
+    const addrs = await lookup(new URL(url).hostname, { all: true, verbatim: true })
+    return addrs.length > 0 && addrs.every((a) => isPublicAddress(a.address))
+  } catch {
+    return false
+  }
+}
+
+const fetchLogo = async (first: string): Promise<Buffer | null> => {
+  let url = first
+  try {
+    for (let hop = 0; hop < 4; hop++) {
+      if (!(await safeToFetch(url))) return null
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000), redirect: 'manual' })
+      if (res.status >= 300 && res.status < 400) {
+        const next = res.headers.get('location')
+        if (!next) return null
+        url = new URL(next, url).toString()
+        continue
+      }
+      if (!res.ok || !/^image\//.test(res.headers.get('content-type') ?? '')) return null
+      if (Number(res.headers.get('content-length') ?? 0) > MAX_BYTES) return null
+      const buf = Buffer.from(await res.arrayBuffer())
+      return buf.length <= MAX_BYTES ? buf : null
+    }
+    return null
   } catch {
     return null
   }
