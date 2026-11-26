@@ -255,12 +255,24 @@ describe('Get the app button on a public site', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('iPhone: shows the two steps with the storefront’s icon', async () => {
+  it('iPhone: shows the two steps with the storefront’s icon, over the whole page', async () => {
     setUa('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)')
-    render(<Storefront />)
+    const shareSpy = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'share', { value: shareSpy, configurable: true })
+    // Like the storefront: the button sits in a sticky, blurred header.
+    render(
+      <header style={{ position: 'sticky', backdropFilter: 'blur(8px)' }}>
+        <Storefront />
+      </header>
+    )
     fireEvent.click(await screen.findByRole('button', { name: 'Get the Kofi And Crumb app' }))
     const sheet = screen.getByRole('dialog', { name: 'Get the Kofi And Crumb app' })
+    expect(sheet.closest('header')).toBeNull()
     expect(sheet.textContent).toContain('Add to Home Screen')
+    // Opens the iPhone's Share menu for this page.
+    fireEvent.click(screen.getByRole('button', { name: 'Open the Share menu' }))
+    expect(shareSpy).toHaveBeenCalledWith({ title: 'Kofi And Crumb', url: window.location.href })
+    delete (navigator as any).share
     expect(sheet.querySelector('img')?.getAttribute('src')).toMatch(/^\/api\/app-icon\?/)
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog')).toBeNull()
